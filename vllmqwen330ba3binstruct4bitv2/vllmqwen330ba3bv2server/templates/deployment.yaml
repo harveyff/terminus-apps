@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: vllm
-          image: "docker.io/beclab/vllm-vllm-openai:v0.15.1-cu130"
+          image: "docker.io/beclab/vllm-vllm-openai:v0.16.0-cu130"
           command:
             - /bin/bash
             - -c
@@ -44,11 +44,11 @@ spec:
               python3 -m vllm.entrypoints.openai.api_server \
                 --model "/models/qwen3-30b" \
 {{- with .Values.olaresEnv }}
-                --gpu-memory-utilization {{ .GPU_MEMORY_UTILIZATION | default "0.95" }} \
-                --max-model-len {{ .MAX_MODEL_LEN | default "8000" }} \
+                --gpu-memory-utilization {{ .GPU_MEMORY_UTILIZATION | default "0.82" }} \
+                --max-model-len {{ .MAX_MODEL_LEN | default "8192" }} \
 {{- else }}
-                --gpu-memory-utilization 0.95 \
-                --max-model-len 8000 \
+                --gpu-memory-utilization 0.82 \
+                --max-model-len 8192 \
 {{- end }}
                 --tensor-parallel-size 1
           env:

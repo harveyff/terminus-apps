@@ -132,11 +132,11 @@ envs:
     type: string
     editable: true
     applyOnChange: true
-    default: "0.95"
+    default: "0.82"
   - envName: MAX_MODEL_LEN
     required: false
     type: string
     editable: true
     applyOnChange: true
-    default: "8000"
+    default: "8192"
 {{- end }}
