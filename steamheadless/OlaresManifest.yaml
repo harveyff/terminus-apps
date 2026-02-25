@@ -5,7 +5,7 @@ metadata:
   description: A Headless Steam Service
   icon: https://app.cdn.olares.com/appstore/steamheadless/icon.png
   appid: steamheadless
-  version: '1.0.26'
+  version: '1.0.27'
   title: Steam Headless
   categories:
   - Fun
@@ -125,7 +125,7 @@ spec:
   requiredDisk: 1Gi
   limitedDisk: 10Gi
   requiredCpu: 2
-  limitedCpu: 8
+  limitedCpu: 18
   requiredGpu: 4Gi
   limitedGpu: 16Gi
   supportArch:
