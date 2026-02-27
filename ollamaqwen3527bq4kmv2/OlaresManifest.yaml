@@ -66,7 +66,7 @@ spec:
   requiredCpu: 150m
   requiredDisk: 50Mi
   limitedDisk: 60Gi
-  limitedMemory: 30Gi
+  limitedMemory: 48Gi
   requiredMemory: 4200Mi
   requiredGpu: 1Gi
   limitedGpu: 24Gi
