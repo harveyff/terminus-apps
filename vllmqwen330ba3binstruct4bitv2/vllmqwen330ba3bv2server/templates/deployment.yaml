@@ -47,7 +47,7 @@ spec:
                 --gpu-memory-utilization {{ .GPU_MEMORY_UTILIZATION | default "0.6" }} \
                 --max-model-len {{ .MAX_MODEL_LEN | default "auto" }} \
 {{- else }}
-                --gpu-memory-utilization 0.55 \
+                --gpu-memory-utilization 0.6 \
                 --max-model-len auto \
 {{- end }}
                 --max-num-seqs 2 \
