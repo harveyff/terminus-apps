@@ -1,4 +1,4 @@
-﻿{{- $vllmDomainENV := split "," .Values.domain.vllmclient -}}
+{{- $vllmDomainENV := split "," .Values.domain.vllmclient -}}
 {{- $vllmDomain := index $vllmDomainENV "_0" -}}
 ---
 apiVersion: apps/v1
@@ -44,12 +44,13 @@ spec:
               python3 -m vllm.entrypoints.openai.api_server \
                 --model "/models/qwen3-30b" \
 {{- with .Values.olaresEnv }}
-                --gpu-memory-utilization {{ .GPU_MEMORY_UTILIZATION | default "0.82" }} \
-                --max-model-len {{ .MAX_MODEL_LEN | default "8192" }} \
+                --gpu-memory-utilization {{ .GPU_MEMORY_UTILIZATION | default "0.6" }} \
+                --max-model-len {{ .MAX_MODEL_LEN | default "auto" }} \
 {{- else }}
-                --gpu-memory-utilization 0.82 \
-                --max-model-len 8192 \
+                --gpu-memory-utilization 0.55 \
+                --max-model-len auto \
 {{- end }}
+                --max-num-seqs 2 \
                 --tensor-parallel-size 1
           env:
             - name: PGID
@@ -62,6 +63,8 @@ spec:
               value: "1"
             - name: VLLM_PORT
               value: "8000"
+            - name: PYTORCH_CUDA_ALLOC_CONF
+              value: "expandable_segments:True"
           ports:
             - containerPort: 8000
           resources:
