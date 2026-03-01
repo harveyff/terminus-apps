@@ -83,9 +83,9 @@ spec:
     - amd64
     - arm64
   subCharts:
-    - name: ollamaqwen3527bq4kmv2server
-      shared: true
-    - name: ollamaqwen3527bq4kmv2
+  - name: ollamaqwen3527bq4kmv2server
+    shared: true
+  - name: ollamaqwen3527bq4kmv2
 permission:
   appData: true
   appCache: true
@@ -95,11 +95,11 @@ options:
   apiTimeout: 0
   appScope:
   {{- if and .Values.admin .Values.bfl.username (eq .Values.admin .Values.bfl.username) }}
-  clusterScoped: true
-  appRef:
-    - ollamaqwen3527bq4kmv2
+    clusterScoped: true
+    appRef:
+      - ollamaqwen3527bq4kmv2
   {{- else }}
-  clusterScoped: false
+    clusterScoped: false
   {{- end }}
   dependencies:
     - name: olares
@@ -107,12 +107,12 @@ options:
       type: system
   {{- if and .Values.admin .Values.bfl.username (eq .Values.admin .Values.bfl.username) }}
   {{- else }}
-  - name: ollamaqwen3527bq4kmv2
-    type: application
-    version: '>=1.0.0'
-    mandatory: true
+    - name: ollamaqwen3527bq4kmv2
+      type: application
+      version: '>=1.0.0'
+      mandatory: true
   {{- end }}
-  {{- if and .Values.admin .Values.bfl.username (eq .Values.admin .Values.bfl.username) }}
+{{- if and .Values.admin .Values.bfl.username (eq .Values.admin .Values.bfl.username) }}
 envs:
   - envName: KEEP_ALIVE
     required: true
@@ -120,4 +120,4 @@ envs:
     editable: true
     applyOnChange: true
     default: "true"
-  {{- end }}
+{{- end }}
