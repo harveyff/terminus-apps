@@ -35,18 +35,28 @@ spec:
     持久化记忆
     - 以 Markdown 文件形式本地存储对话历史和上下文。
   upgradeDescription: |
-    升级至版本 2026.2.9
+    升级至版本 2026.2.26
 
-    新增
-    iOS：上线 alpha 版节点应用，并支持通过设置码进行引导。 (#11756) 感谢 @mbelinky。
-    频道：全面优化 BlueBubbles 和频道相关功能。 (#11093) 感谢 @tyler6204。
-    插件：支持设备配对和手机控制插件（Telegram /pair，iOS/Android 节点控制）。 (#11755) 感谢 @mbelinky。
-    工具：新增 Grok（xAI）作为网页搜索提供方。 (#12419) 感谢 @tmchow。
-    网关：为 Web UI 增加代理管理的 RPC 方法（agents.create、agents.update、agents.delete）。 (#11045) 感谢 @advaitpaliwal。
-    Web UI：聊天历史支持展示压缩分隔线。 (#11341) 感谢 @Takhoffman。
-    代理：代理信封中包含运行时 shell 信息。 (#1835) 感谢 @Takhoffman。
-    路径：新增 OPENCLAW_HOME，用于覆盖内部路径解析所用的主目录。 (#12091) 感谢 @sebslight。
+    重要说明：
+    如果您是从 2026.2.25 之前的版本升级，请参阅以下文档，以解决升级后控制界面无法启动的问题。
+    https://docs.olares.com/use-cases/openclaw.html#upgrade-notes
 
-    以及许多错误修复和改进。
+    亮点与新功能：
+    外部机密管理：提供完整的机密工作流（审计、配置、应用、热重载），支持运行时快照激活。
+    ACP/线程绑定代理：ACP 代理现已作为线程会话中的一等运行时。
+    代理路由 CLI：新增 openclaw agents bindings/bind/unbind 命令，实现以账户为范围的路由管理。
+    Codex WebSocket 传输：OpenAI Codex 现在默认使用 WebSocket（支持 SSE 回退）。
+    安卓设备支持：Android 节点具备 device.status 和 device.info 命令能力。
+    插件交互式引导：频道插件现可拥有自己的交互引导流程。
 
-    完整发布说明见：https://github.com/openclaw/openclaw/releases/tag/v2026.2.9
+    主要修复与改进：
+    输入指示器：修复了在多平台（Telegram、飞书、Matrix 等）下输入指示器卡死、跨频道泄露、清理竞态等重要问题。
+    发送与队列可靠性：增强了重试退避、排队逻辑及定时代理超时处理。
+    配置与巡检：改进了 dmPolicy: "allowlist" 配置的校验与修复，防止私信被静默丢弃。
+    浏览器/扩展转发：修复了 CORS、认证、重连和关闭等多个问题。
+    多平台问题修复：解决了 Google Chat、Nextcloud Talk、Microsoft Teams 文件上传、LINE 认证等平台相关的生命周期和 webhook 问题。
+    安全加固：针对节点执行审批、插件 HTTP 鉴权、网关配对、沙盒路径、配置包含、媒体抓取 SSRF 防护等内容进行了重要安全更新。
+
+    以及众多其他修复和改进。
+
+    完整发布说明详见：https://github.com/openclaw/openclaw/releases/tag/v2026.2.26
