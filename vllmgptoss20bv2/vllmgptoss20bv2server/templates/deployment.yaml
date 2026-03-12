@@ -30,26 +30,33 @@ spec:
       initContainers:
         - name: download-tiktoken
           image: beclab/alpine:3.18
+          envFrom:
+            - configMapRef:
+                name: vllm-config
           command:
             - /bin/sh
             - -c
             - |
-              set -e
+              set -eu
 
-              apk add --no-cache curl
+              : "${CDN_HOST:?CDN_HOST is required}"
+              echo "Using CDN_HOST=${CDN_HOST}"
 
               mkdir -p /data/tiktoken
 
-              if [ ! -f /data/tiktoken/o200k_base.tiktoken ]; then
-                echo "Downloading o200k_base.tiktoken"
-                curl -L https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken \
-                  -o /data/tiktoken/o200k_base.tiktoken
+              if [ ! -s /data/tiktoken/o200k_base.tiktoken ] || [ ! -s /data/tiktoken/cl100k_base.tiktoken ]; then
+                echo "Installing curl..."
+                apk add --no-cache curl
               fi
 
-              if [ ! -f /data/tiktoken/cl100k_base.tiktoken ]; then
+              if [ ! -s /data/tiktoken/o200k_base.tiktoken ]; then
+                echo "Downloading o200k_base.tiktoken"
+                curl -fL --retry 3 "${CDN_HOST}/o200k_base.tiktoken" -o /data/tiktoken/o200k_base.tiktoken
+              fi
+
+              if [ ! -s /data/tiktoken/cl100k_base.tiktoken ]; then
                 echo "Downloading cl100k_base.tiktoken"
-                curl -L https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken \
-                  -o /data/tiktoken/cl100k_base.tiktoken
+                curl -fL --retry 3 "${CDN_HOST}/cl100k_base.tiktoken" -o /data/tiktoken/cl100k_base.tiktoken
               fi
 
               ls -lh /data/tiktoken
@@ -77,7 +84,7 @@ spec:
 {{- $gpuMemUtil := "0.9" -}}
 {{- $maxModelLen := "auto" -}}
 {{- if eq $isSparkDGX "true" -}}
-{{- $gpuMemUtil = "0.85" -}}
+{{- $gpuMemUtil = "0.88" -}}
 {{- $maxModelLen := "8192" -}}
 {{- end -}}
 {{- with .Values.olaresEnv }}

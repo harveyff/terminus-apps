@@ -69,7 +69,7 @@ spec:
   limitedDisk: 50Gi
   limitedMemory: 30Gi
   requiredMemory: 22Gi
-  requiredGpu: 23Gi
+  requiredGpu: 23.5Gi
   limitedGpu: 30Gi
   {{- else }}
   requiredMemory: 64Mi
@@ -118,7 +118,7 @@ options:
 {{- if and .Values.admin .Values.bfl.username (eq .Values.admin .Values.bfl.username) }}
 envs:
   - envName: OLARES_USER_HUGGINGFACE_TOKEN
-    required: true
+    required: false
     applyOnChange: true
     valueFrom:
       envName: OLARES_USER_HUGGINGFACE_TOKEN

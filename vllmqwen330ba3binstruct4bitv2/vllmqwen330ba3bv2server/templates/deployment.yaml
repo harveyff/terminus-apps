@@ -48,7 +48,7 @@ spec:
 {{- $gpuMemUtil := "0.9" -}}
 {{- $maxModelLen := "auto" -}}
 {{- if eq $isSparkDGX "true" -}}
-{{- $gpuMemUtil = "0.85" -}}
+{{- $gpuMemUtil = "0.88" -}}
 {{- $maxModelLen := "8192" -}}
 {{- end -}}
 {{- with .Values.olaresEnv }}
