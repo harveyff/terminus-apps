@@ -9,7 +9,7 @@ metadata:
   description: Multilingual translation model from Hunyuan
   appid: vllmhymt1518bv2
   title: HY-MT1.5-1.8B (vLLM)
-  version: '1.0.3'
+  version: '1.0.4'
   categories:
     - AI
 
@@ -62,7 +62,7 @@ spec:
   limitedDisk: 50Gi
   limitedMemory: 10Gi
   requiredMemory: 8Gi
-  requiredGpu: 8Gi
+  requiredGpu: 6Gi
   limitedGpu: 16Gi
   {{- else }}
   requiredMemory: 64Mi
