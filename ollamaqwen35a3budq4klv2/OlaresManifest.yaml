@@ -7,7 +7,7 @@ metadata:
   icon: https://app.cdn.olares.com/appstore/llm/ollama/llm/qwen3-14b.png
   description: Run Qwen3.5-35B-A3B (Q4_K_L quantization) locally via Ollama.
   appid: ollamaqwen35a3budq4klv2
-  title: Qwen3.5 35B A3B UD Q4_K_L (Ollama)
+  title: Qwen3.5 35B A3B UD Q4 (Ollama)
   version: '1.0.1'
   categories:
     - AI
