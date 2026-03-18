@@ -109,10 +109,15 @@ spec:
     url: https://github.com/open-webui/open-webui?tab=MIT-1-ov-file#readme
   limitedCpu: 2000m
   limitedDisk: 10Gi
-  limitedMemory: 3072Mi
+
   requiredCpu: 50m
   requiredDisk: 100Mi
   requiredMemory: 512Mi
+
+  requiredGpu: 1Gi
+  limitedGpu: 8Gi
+  limitedMemory: 6500Mi
+
   supportArch:
   - amd64
   - arm64
