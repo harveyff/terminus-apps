@@ -113,11 +113,9 @@ spec:
   requiredCpu: 50m
   requiredDisk: 100Mi
   requiredMemory: 512Mi
-
+  limitedMemory: 8Gi
   requiredGpu: 1Gi
   limitedGpu: 8Gi
-  limitedMemory: 6500Mi
-
   supportArch:
   - amd64
   - arm64

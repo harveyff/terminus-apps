@@ -11,7 +11,9 @@ metadata:
   labels:
     io.kompose.service: openwebui
   annotations:
+{{- if and .Values.olaresEnv (eq (lower (toString .Values.olaresEnv.HF_HUB_OFFLINE)) "false") }}
     applications.app.bytetrade.io/gpu-inject: "true"
+{{- end }}
 spec:
   replicas: 1
   strategy:
@@ -28,7 +30,11 @@ spec:
       restartPolicy: Always
       containers:
         - name: openwebui
+{{- if and .Values.olaresEnv (eq (lower (toString .Values.olaresEnv.HF_HUB_OFFLINE)) "false") }}
+          image: 'docker.io/beclab/openwebui-open-webui:0.8.10-cuda'
+{{- else }}
           image: 'docker.io/beclab/open-webui-open-webui:v0.8.10'
+{{- end }}
 
           ports:
             - containerPort: 8080
@@ -84,9 +90,9 @@ spec:
             limits:
               cpu: "2"
 {{- if and .Values.olaresEnv (eq (lower (toString .Values.olaresEnv.HF_HUB_OFFLINE)) "false") }}
-              memory: 6144Mi
+              memory: 8Gi
 {{- else }}
-              memory: 3072Mi
+              memory: 3Gi
 {{- end }}
             requests:
               cpu: 50m
