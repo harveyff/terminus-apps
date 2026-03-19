@@ -30,12 +30,7 @@ spec:
       restartPolicy: Always
       containers:
         - name: openwebui
-{{- if and .Values.olaresEnv (eq (lower (toString .Values.olaresEnv.HF_HUB_OFFLINE)) "false") }}
           image: 'docker.io/beclab/openwebui-open-webui:0.8.10-cuda'
-{{- else }}
-          image: 'docker.io/beclab/open-webui-open-webui:v0.8.10'
-{{- end }}
-
           ports:
             - containerPort: 8080
 
@@ -85,6 +80,8 @@ spec:
               value: "OpenWebUI/0.8.10"
             - name: WEBSOCKET_EVENT_CALLER_TIMEOUT
               value: "600"
+            - name: RAG_EMBEDDING_ENGINE
+              value: "ollama"
 
           resources:
             limits:
@@ -101,8 +98,14 @@ spec:
           volumeMounts:
             - name: appdata
               mountPath: /app/backend/data
+            - name: hf-cache
+              mountPath: /app/backend/data/cache
 
       volumes:
+        - name: hf-cache
+          hostPath:
+            path: "{{ .Values.userspace.userData }}/Huggingface/{{ .Release.Name }}"
+            type: DirectoryOrCreate
         - name: appdata
           hostPath:
             {{- if .Values.sysVersion }}
