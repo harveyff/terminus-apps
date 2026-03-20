@@ -1,0 +1,17 @@
+metadata:
+  title: Qwen3.5 27B GGUF Q3_K_XL (Ollama)
+  description: Run Qwen3.5-27B (Q3_K_XL quantization) locally via Ollama.
+
+spec:
+  fullDescription: |
+    ## IMPORTANT NOTE ##
+    This is a shared app. Once installed by the Olares Admin, all users in the cluster can use it through reference app.
+
+    ## MODEL ##
+    Qwen3.5-27B is a dense model from the Qwen3.5 series by Alibaba with 27.8B parameters. It uses the Efficient Hybrid Architecture (Gated Delta Networks) for high-throughput inference. Qwen3.5 integrates breakthroughs in multimodal learning, architectural efficiency, and reinforcement learning to empower developers and enterprises with unprecedented capability.
+
+    - Model: Qwen3.5-27B-UD-Q3_K_XL
+    - Source: unsloth/Qwen3.5-27B-GGUF (Hugging Face)
+    - Quantization: Q3_K_XL (Unsloth Dynamic)
+    - Context: 128000
+    - Backend: Ollama
