@@ -30,7 +30,16 @@ data:
           "maxConcurrent": 4,
           "subagents": {
             "maxConcurrent": 8
-          } 
+          },
+          "sandbox": {
+            "mode": "all",
+            "backend": "docker",
+            "scope": "session",
+            "workspaceAccess": "none",
+            "docker": {
+              "network": "bridge"
+            }
+          }
         }
       },
       "messages": {

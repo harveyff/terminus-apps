@@ -6,7 +6,7 @@ metadata:
   description: Personal AI Assistant with Multi-channel Inbox Support
   appid: clawdbot
   title: OpenClaw
-  version: 0.1.24
+  version: 1.1.25
   categories:
   - Productivity_v112
   - Developer Tools
@@ -20,8 +20,8 @@ entrances:
   openMethod: window
   authLevel: internal
 - name: clawdbot
-  host: clawdbot
-  port: 18789
+  host: clawdbotingress
+  port: 8080
   icon: https://app.cdn.olares.com/appstore/clawdbot/icon.png
   title: Control UI
   openMethod: window
@@ -78,12 +78,12 @@ spec:
   license:
   - text: MIT
     url: https://github.com/openclaw/openclaw#MIT-1-ov-file
-  requiredMemory: 1.5Gi
-  limitedMemory: 8.5Gi
+  requiredMemory: 2Gi
+  limitedMemory: 14.5Gi
   requiredDisk: 50Mi
   limitedDisk: 10Gi
-  requiredCpu: 1.5
-  limitedCpu: 8.5
+  requiredCpu: 2
+  limitedCpu: 14.5
   supportArch:
   - amd64
   - arm64

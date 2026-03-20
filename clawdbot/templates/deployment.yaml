@@ -123,12 +123,16 @@ spec:
               value: /home/linuxbrew/.linuxbrew
             - name: HOMEBREW_NO_AUTO_UPDATE
               value: "1"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=3072"
+            - name: DOCKER_HOST
+              value: "tcp://localhost:2375"
             - name: PATH
               value: "/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/node/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           resources:
             limits:
-              cpu: "1"
-              memory: 1536Mi
+              cpu: "2"
+              memory: 4Gi
             requests:
               cpu: 200m
               memory: 256Mi
@@ -187,6 +191,8 @@ spec:
               value: "1"
             - name: DOCKER_HOST
               value: "tcp://localhost:2375"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=5120"
             - name: PATH
               value: "/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/node/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           readinessProbe:
@@ -205,8 +211,8 @@ spec:
             failureThreshold: 3
           resources:
             limits:
-              cpu: "2"
-              memory: 4608Mi
+              cpu: "3"
+              memory: 6Gi
             requests:
               cpu: 500m
               memory: 512Mi
@@ -246,13 +252,22 @@ spec:
           env:
             - name: DOCKER_TLS_CERTDIR
               value: ""
-          command: ["dockerd", "--host", "tcp://0.0.0.0:2375", "--host", "unix:///var/run/docker.sock"]
+          command:
+            - sh
+            - -c
+            - |
+              dockerd --host tcp://0.0.0.0:2375 --host unix:///var/run/docker.sock &
+              DOCKERD_PID=$!
+              until docker info >/dev/null 2>&1; do sleep 1; done
+              echo "[dind] dockerd ready, pre-pulling sandbox image..."
+              docker pull harveyff/openclaw-sandbox-common:2026.3.12 && echo "[dind] sandbox image ready" || echo "[dind] sandbox image pull failed" &
+              wait $DOCKERD_PID
           ports:
             - containerPort: 2375
           resources:
             limits:
-              cpu: "1"
-              memory: 2Gi
+              cpu: "1500m"
+              memory: 3Gi
             requests:
               cpu: 300m
               memory: 256Mi
