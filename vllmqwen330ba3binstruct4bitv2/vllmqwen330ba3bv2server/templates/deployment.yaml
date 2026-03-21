@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: vllm
-          image: "docker.io/vllm/vllm-openai:v0.17.1-cu130"
+          image: "docker.io/vllm/vllm-openai:v0.18.0-cu130"
           command:
             - /bin/bash
             - -c
@@ -44,8 +44,9 @@ spec:
 {{- $gpuMemUtil := "0.9" -}}
 {{- $maxModelLen := "auto" -}}
 {{- if eq $isSparkDGX "true" -}}
-{{- $gpuMemUtil = "0.88" -}}
-{{- $maxModelLen := "8192" -}}
+{{- /* Spark DGX: use = not := for $maxModelLen. v1 engine + torch.compile + CUDA graphs need headroom; 0.78 left KV pool negative (see gpu_worker Available KV cache memory). */ -}}
+{{- $gpuMemUtil = "0.86" -}}
+{{- $maxModelLen = "3072" -}}
 {{- end -}}
 {{- with .Values.olaresEnv }}
                 --gpu-memory-utilization {{ .GPU_MEMORY_UTILIZATION | default $gpuMemUtil }} \
@@ -54,7 +55,10 @@ spec:
                 --gpu-memory-utilization {{ $gpuMemUtil }} \
                 --max-model-len {{ $maxModelLen }} \
 {{- end }}
-                --tensor-parallel-size 1
+                --tensor-parallel-size 1 {{- if eq $isSparkDGX "true" }} \
+                --enforce-eager \
+                --max-num-seqs 8 \
+                --no-enable-prefix-caching{{- end }}
           env:
             - name: PGID
               value: "1000"
@@ -66,15 +70,19 @@ spec:
               value: "1"
             - name: VLLM_PORT
               value: "8000"
+            {{- if eq $isSparkDGX "true" }}
+            - name: VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+              value: "1"
+            {{- end }}
           ports:
             - containerPort: 8000
           resources:
             limits:
               cpu: "18"
-              memory: 28Gi
+              memory: {{ if eq $isSparkDGX "true" }}40Gi{{ else }}32Gi{{ end }}
             requests:
               cpu: 500m
-              memory: 21Gi
+              memory: {{ if eq $isSparkDGX "true" }}30Gi{{ else }}21Gi{{ end }}
           volumeMounts:
             - mountPath: /models/qwen3-30b
               name: data

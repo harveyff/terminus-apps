@@ -61,7 +61,7 @@ spec:
               mountPath: /data
       containers:
         - name: vllm
-          image: "docker.io/vllm/vllm-openai:v0.17.1-cu130"
+          image: "docker.io/vllm/vllm-openai:v0.18.0-cu130"
           command:
             - /bin/bash
             - -c
@@ -80,8 +80,8 @@ spec:
 {{- $gpuMemUtil := "0.9" -}}
 {{- $maxModelLen := "auto" -}}
 {{- if eq $isSparkDGX "true" -}}
-{{- $gpuMemUtil = "0.88" -}}
-{{- $maxModelLen := "8192" -}}
+{{- $gpuMemUtil = "0.86" -}}
+{{- $maxModelLen = "3072" -}}
 {{- end -}}
 {{- with .Values.olaresEnv }}
                 --gpu-memory-utilization {{ .GPU_MEMORY_UTILIZATION | default $gpuMemUtil }} \
@@ -90,7 +90,10 @@ spec:
                 --gpu-memory-utilization {{ $gpuMemUtil }} \
                 --max-model-len {{ $maxModelLen }} \
 {{- end }}
-                --tensor-parallel-size 1
+                --tensor-parallel-size 1 {{- if eq $isSparkDGX "true" }} \
+                --enforce-eager \
+                --max-num-seqs 8 \
+                --no-enable-prefix-caching{{- end }}
           env:
             - name: PGID
               value: "1000"
@@ -104,15 +107,19 @@ spec:
               value: "8000"
             - name: TIKTOKEN_ENCODINGS_BASE
               value: /data/tiktoken
+            {{- if eq $isSparkDGX "true" }}
+            - name: VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+              value: "1"
+            {{- end }}
           ports:
             - containerPort: 8000
           resources:
             limits:
               cpu: "18"
-              memory: 28Gi
+              memory: {{ if eq $isSparkDGX "true" }}40Gi{{ else }}28Gi{{ end }}
             requests:
               cpu: 500m
-              memory: 20Gi
+              memory: {{ if eq $isSparkDGX "true" }}30Gi{{ else }}20Gi{{ end }}
           volumeMounts:
             - mountPath: /models/gpt-oss-20b
               name: data
