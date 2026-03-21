@@ -61,7 +61,7 @@ spec:
   requiredCpu: 1
   requiredDisk: 10Gi
   limitedDisk: 50Gi
-  # >= Spark: vllm 40Gi + download 1Gi + nginx 500Mi + headroom; requests ~31Gi
+  # Worst case (Spark DGX): vllm 40Gi + download 1Gi + nginx 500Mi + headroom; non-Spark uses lower K8s requests in chart
   limitedMemory: 46Gi
   requiredMemory: 31Gi
   requiredGpu: 23Gi
