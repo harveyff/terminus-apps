@@ -17,4 +17,4 @@ spec:
     - 后端：Ollama
 
   upgradeDescription: |
-    Ollama 运行时升级至 0.18.2
+    Optimize the think mode in the proxy gateway

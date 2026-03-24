@@ -8,7 +8,7 @@ metadata:
   description: Run Qwen3.5-35B-A3B GGUF (Q4_K_L quantization) locally via Ollama.
   appid: ollamaqwen35a3budq4klv2
   title: Qwen3.5 35B A3B UD-Q4 (Ollama)
-  version: '1.0.5'
+  version: '1.0.6'
   categories:
     - AI
 sharedEntrances:
@@ -43,7 +43,7 @@ spec:
     - Backend: Ollama
 
   upgradeDescription: |
-    Ollama runtime upgraded to 0.18.2
+    Optimize the think mode in the proxy gateway
   developer: Alibaba
   website: https://qwen.ai/home
   submitter: Olares
