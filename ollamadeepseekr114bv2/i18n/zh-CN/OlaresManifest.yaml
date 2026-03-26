@@ -1,14 +1,14 @@
 metadata:
   title: DeepSeek-R1 14B (Ollama)
-  description: 一系列开放推理模型，其性能接近领先模型。
+  description: 一系列开放推理模型，其性能接近领先模型�?
 
 spec:
   fullDescription: |
     ## 使用须知 ##
-    该应用为共享应用，Olares 管理员安装后，集群中的所有用户都可以通过授权应用程序来调用它。
+    该应用为共享应用，Olares 管理员安装后，集群中的所有用户都可以通过授权应用程序来调用它�?
 
     ## 模型概览 ##
-    DeepSeek-R1 已进行小版本升级，升级至 DeepSeek-R1-0528，包含 80 亿参数精简模型和 6710 亿参数完整模型。此次更新显著提升了 DeepSeek R1 的推理能力。该模型在数学、编程和通用逻辑等多项基准测试中均展现出卓越的性能。其整体性能现已接近 O3 和 Gemini 2.5 Pro 等领先模型。
+    DeepSeek-R1 已进行小版本升级，升级至 DeepSeek-R1-0528，包�?80 亿参数精简模型�?6710 亿参数完整模型。此次更新显著提升了 DeepSeek R1 的推理能力。该模型在数学、编程和通用逻辑等多项基准测试中均展现出卓越的性能。其整体性能现已接近 O3 �?Gemini 2.5 Pro 等领先模型�?
 
     # DeepSeek-R1 模型
     DeepSeek-R1-Zero
@@ -21,7 +21,7 @@ spec:
     - 激活参数：37B
     - 上下文长度：128K
 
-    DeepSeek-R1-Zero 和 DeepSeek-R1 均基于 DeepSeek-V3-Base 进行训练。有关模型架构的更多详细信息，请参阅 DeepSeek-V3 代码库。
+    DeepSeek-R1-Zero �?DeepSeek-R1 均基�?DeepSeek-V3-Base 进行训练。有关模型架构的更多详细信息，请参阅 DeepSeek-V3 代码库�?
 
     # DeepSeek-R1-Distill 模型
     DeepSeek-R1-Distill-Qwen-1.5B
@@ -42,4 +42,6 @@ spec:
     DeepSeek-R1-Distill-Llama-70B
     - 基础模型：Llama-3.3-70B-Instruct
 
-    DeepSeek-R1-Distill 模型基于开源模型，使用DeepSeek-R1生成的样本进行微调。我们略微修改了它们的配置和分词器。请使用我们的设置来运行这些模型。
+    DeepSeek-R1-Distill 模型基于开源模型，使用DeepSeek-R1生成的样本进行微调。我们略微修改了它们的配置和分词器。请使用我们的设置来运行这些模型�
+  upgradeDescription: |
+    升级 Ollama 至 0.18.3。主要性能改进包括优化缓存处理以加快本地推理速度、改进上下文压缩提升内存效率、提升工具调用准确性，以及支持 AMD GPU 的 ROCm 7。
