@@ -73,7 +73,7 @@ spec:
 {{- if and .Values.olaresEnv (eq (lower (toString .Values.olaresEnv.HF_HUB_OFFLINE)) "false") }}
           image: 'docker.io/beclab/openwebui-open-webui:0.8.12-cuda'
 {{- else }}
-          image: 'docker.io/beclab/open-webui-open-webui:v0.8.12'
+          image: 'docker.io/beclab/open-webui-open-webui:0.8.12'
 {{- end }}
           ports:
             - containerPort: 8080
