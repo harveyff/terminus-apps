@@ -63,12 +63,12 @@ spec:
   license:
   - text: AGPL-3.0
     url: https://github.com/mauriceboe/NOMAD/blob/main/LICENSE
-  requiredMemory: 256Mi
-  limitedMemory: 2Gi
+  requiredMemory: 320Mi
+  limitedMemory: 2304Mi
   requiredDisk: 128Mi
   limitedDisk: 50Gi
-  requiredCpu: '0.1'
-  limitedCpu: '2'
+  requiredCpu: '0.2'
+  limitedCpu: '2.5'
   supportArch:
   - amd64
 permission:
