@@ -44,7 +44,7 @@ spec:
       restartPolicy: Always
       containers:
         - name: llm-init
-          image: docker.io/beclab/llm-init:v1.1.0
+          image: docker.io/beclab/llm-init:v1.2.1
           imagePullPolicy: IfNotPresent
           env:
             - name: ENGINE_KIND
@@ -87,11 +87,13 @@ spec:
             failureThreshold: 3
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
+              cpu: 200m
               memory: 256Mi
+            limits:
+              # model pull needs headroom; 256Mi can get OOMKilled mid-pull
+              # -> pod restart -> state machine wedges. 1Gi is safe.
+              cpu: "1"
+              memory: 1Gi
 ---
 apiVersion: v1
 kind: Service
