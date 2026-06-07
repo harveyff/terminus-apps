@@ -138,8 +138,10 @@ spec:
               cpu: 100m
               memory: 128Mi
             limits:
+              # hf download (4 workers) needs headroom; 256Mi gets OOMKilled
+              # mid-download -> pod restart -> state machine wedges. 1Gi is safe.
               cpu: 500m
-              memory: 256Mi
+              memory: 1Gi
 ---
 # llm-init download/progress + OpenAI proxy surface (app entrance backend).
 apiVersion: v1

@@ -7,7 +7,7 @@ metadata:
   description: "Generic vLLM + llm-init base. Pick any HF model at install via env."
   appid: vllmllmbasev3
   title: vLLM LLM Base (llm-init)
-  version: '1.0.3'
+  version: '1.0.4'
   categories:
     - AI
 sharedEntrances:
@@ -103,6 +103,7 @@ spec:
     v1.0.16: sentinel/model_path now live under appCache/llm-init-run/<instance>
     per release (fixes cross-instance handshake collisions). After upgrade, Retry
     once or restart both workloads so vLLM picks up the new model_path.
+    v1.0.4: raise llm-init memory limit to 1Gi (256Mi OOM during HF download).
 
   developer: beclab
   website: https://github.com/beclab/llm-init
