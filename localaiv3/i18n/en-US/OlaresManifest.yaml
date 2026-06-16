@@ -1,0 +1,36 @@
+metadata:
+  title: LocalAI V3 for test
+  description: The free, Open Source alternative to OpenAI, Claude and others.
+spec:
+  fullDescription: |
+    **IMPORTANT NOTE**
+    This is a shared app. Once installed by the Olares Admin, all users in the cluster can use it through reference app.
+
+    LocalAI is the free, Open Source OpenAI alternative. LocalAI act as a drop-in replacement REST API that's compatible with OpenAI (Elevenlabs, Anthropic... ) API specifications for local AI inferencing. It allows you to run LLMs, generate images, audio (and not only) locally or on-prem with consumer grade hardware, supporting multiple model families. Does not require GPU.
+
+    **Features**
+    - Text generation with GPTs (llama.cpp, transformers, vllm ... and more)
+    - Text to Audio
+    - Audio to Text (Audio transcription with whisper.cpp)
+    - Image generation
+    - OpenAI-alike tools API
+    - Embeddings generation for vector databases
+    - Constrained grammars
+    - Download Models directly from Huggingface
+    - Vision API
+    - Reranker API
+    - P2P Inferencing
+    - Voice activity detection (Silero-VAD support)
+    - Integrated WebUI!
+  upgradeDescription: |
+    V3 shared-app build of LocalAI (engine v4.4.3, image
+    localai/localai:v4.4.3-gpu-nvidia-cuda-13).
+    - New standalone v3 app (appid localaiv3); conflicts with the legacy localai.
+    - Single engine Deployment named after the appid (localaiv3), declared via
+      workloadReplicas; the entrance routes directly to the engine Service :8080.
+    - Added a sharedentrances-api Service so other cluster apps can reach the
+      OpenAI-compatible API over the internal shared domain.
+    - GPU declared via spec.accelerator (nvidia); models and v4 persistent dirs
+      (data/backends/configuration) live under appCache so they survive restarts.
+    - Removed the admin-only conditional guards and the unused postgres
+      middleware / dead models ConfigMap from the legacy chart.

@@ -1,0 +1,135 @@
+{{- $hfEndpoint := (.Values.olaresEnv | default dict).HF_ENDPOINT | default "" -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Primary workload: named after the release (== appid localaiv3) for v3
+  # workload verification. The label/selector stays app: localai so the
+  # Services below keep resolving.
+  name: '{{ .Release.Name }}'
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+    app: localai
+  annotations:
+    applications.app.bytetrade.io/gpu-inject: "true"
+spec:
+  replicas: {{ .Values.workloads.localaiv3.replicaCount }}
+  selector:
+    matchLabels:
+      app: localai
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: localai
+        io.kompose.network/chrome-default: "true"
+    spec:
+      containers:
+        - name: localai
+          image: "localai/localai:v4.4.3-gpu-nvidia-cuda-13"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGID
+              value: "1000"
+            - name: PUID
+              value: "1000"
+            - name: TZ
+              value: Etc/UTC
+            # v4: DEBUG is deprecated; use LOCALAI_LOG_LEVEL instead.
+            - name: LOCALAI_LOG_LEVEL
+              value: "debug"
+            # Model store (LocalAI's own flat layout) under appCache so
+            # downloaded models persist across restarts.
+            - name: MODELS_PATH
+              value: "/models"
+            # v4 separates persistent data (agent state, tasks, jobs,
+            # collectiondb) from models/config — mount it or it is lost on restart.
+            - name: LOCALAI_DATA_PATH
+              value: "/data"
+            # v4 installs backends at runtime from the backend gallery; persist
+            # them so they are not re-downloaded on every pod restart.
+            - name: LOCALAI_BACKENDS_PATH
+              value: "/backends"
+            # Dynamic, WebUI-editable config (runtime_settings.json, api_keys.json,
+            # external_backends.json). Persist to keep WebUI settings across restarts.
+            - name: LOCALAI_CONFIG_DIR
+              value: "/configuration"
+            - name: THREADS
+              value: "4"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: MODELS
+              value: ""
+            # HF mirror (system-sourced via valueFrom in OlaresManifest); empty
+            # falls back to huggingface.co.
+            - name: HF_ENDPOINT
+              value: "{{ $hfEndpoint }}"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 16Gi
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            # All four LocalAI dirs live under the single appCache volume via
+            # subPaths. data/backends/configuration are SIBLINGS of models (not
+            # nested under it) so LocalAI's model scanner does not pick them up.
+            - mountPath: /models
+              name: localai-store
+              subPath: models
+            - mountPath: /data
+              name: localai-store
+              subPath: data
+            - mountPath: /backends
+              name: localai-store
+              subPath: backends
+            - mountPath: /configuration
+              name: localai-store
+              subPath: configuration
+          securityContext:
+            capabilities:
+              add:
+                - SYS_ADMIN
+      volumes:
+        - name: localai-store
+          hostPath:
+            type: DirectoryOrCreate
+            path: '{{ .Values.userspace.appCache }}/localai'
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localai
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+    app: localai
+spec:
+  selector:
+    app: localai
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sharedentrances-api
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+    app: localai
+spec:
+  selector:
+    app: localai
+  ports:
+    - name: "sharedentrances-api"
+      port: 80
+      targetPort: 8080

@@ -1,0 +1,138 @@
+olaresManifest.version: '0.12.0'
+olaresManifest.type: app
+apiVersion: 'v3'
+metadata:
+  name: localaiv3
+  description: The free, Open Source alternative to OpenAI, Claude and others.
+  icon: https://app.cdn.olares.com/appstore/localai/icon.png
+  appid: localaiv3
+  version: '1.0.0'
+  title: LocalAI V3 for test
+  categories:
+    - Utilities_v112
+    - Productivity
+sharedEntrances:
+  - name: localaiv3
+    title: LocalAI API
+    host: sharedentrances-api
+    icon: https://app.cdn.olares.com/appstore/localai/icon.png
+    port: 0
+    invisible: true
+    authLevel: internal
+entrances:
+  # Entrance routes directly to the LocalAI engine Service on :8080 (LocalAI
+  # serves its own WebUI + OpenAI-compatible API there); no nginx proxy layer,
+  # mirroring the xinferencev3 v3 pattern.
+  - name: localaiv3
+    port: 8080
+    host: localai
+    title: LocalAI
+    icon: https://app.cdn.olares.com/appstore/localai/icon.png
+    openMethod: window
+    authLevel: internal
+# Declares every workload's replica count (v3 schema). Keys MUST match the
+# rendered Deployment metadata.name and values.yaml workloads.<name>:
+#   localaiv3 — LocalAI engine + WebUI Deployment (== appid / Release.Name)
+workloadReplicas:
+  localaiv3: 1
+permission:
+  appData: true
+  appCache: true
+spec:
+  versionName: '4.4.3'
+  featuredImage: https://app.cdn.olares.com/appstore/localai/1.webp
+  promoteImage:
+  - https://app.cdn.olares.com/appstore/localai/1.webp
+  - https://app.cdn.olares.com/appstore/localai/2.webp
+  - https://app.cdn.olares.com/appstore/localai/3.webp
+  fullDescription: |
+    **IMPORTANT NOTE**
+    This is a shared app. Once installed by the Olares Admin, all users in the cluster can use it through reference app.
+
+    LocalAI is the free, Open Source OpenAI alternative. LocalAI act as a drop-in replacement REST API that's compatible with OpenAI (Elevenlabs, Anthropic... ) API specifications for local AI inferencing. It allows you to run LLMs, generate images, audio (and not only) locally or on-prem with consumer grade hardware, supporting multiple model families. Does not require GPU.
+
+    **Features**
+    - Text generation with GPTs (llama.cpp, transformers, vllm ... and more)
+    - Text to Audio
+    - Audio to Text (Audio transcription with whisper.cpp)
+    - Image generation
+    - OpenAI-alike tools API
+    - Embeddings generation for vector databases
+    - Constrained grammars
+    - Download Models directly from Huggingface
+    - Vision API
+    - Reranker API
+    - P2P Inferencing
+    - Voice activity detection (Silero-VAD support)
+    - Integrated WebUI!
+  upgradeDescription: |
+    V3 shared-app build of LocalAI (engine v4.4.3, image
+    localai/localai:v4.4.3-gpu-nvidia-cuda-13).
+    - New standalone v3 app (appid localaiv3); conflicts with the legacy localai.
+    - Single engine Deployment named after the appid (localaiv3), declared via
+      workloadReplicas; the entrance routes directly to the engine Service :8080.
+    - Added a sharedentrances-api Service so other cluster apps can reach the
+      OpenAI-compatible API over the internal shared domain.
+    - GPU declared via spec.accelerator (nvidia); models and v4 persistent dirs
+      (data/backends/configuration) live under appCache so they survive restarts.
+    - Removed the admin-only conditional guards and the unused postgres
+      middleware / dead models ConfigMap from the legacy chart.
+  developer: Ettore Di Giacinto
+  website: https://localai.io/
+  sourceCode: https://github.com/mudler/LocalAI
+  submitter: Olares
+  doc: https://localai.io/
+  license:
+  - text: MIT
+    url: https://github.com/mudler/LocalAI#MIT-1-ov-file
+  locale:
+    - en-US
+    - zh-CN
+  accelerator:
+  # Olares validates per mode, summing ALL app containers (initContainers
+  # excluded): Σ requests.cpu <= requiredCpu, Σ requests.memory <= requiredMemory,
+  # Σ limits.cpu <= limitedCpu, Σ limits.memory <= limitedMemory.
+  #   container       req cpu / mem      lim cpu / mem
+  #   localai (gpu)   500m / 2Gi         2000m / 16Gi
+  #   ---------------------------------------------------------
+  #   Σ               500m / 2Gi         2000m / 16Gi
+  - mode: nvidia
+    requiredCpu: 500m
+    limitedCpu: 2000m
+    requiredMemory: 2Gi
+    limitedMemory: 16Gi
+    requiredDisk: 20Gi
+    limitedDisk: 100Gi
+    requiredGPUMemory: 2Gi
+    limitedGPUMemory: 16Gi
+  supportArch:
+    - amd64
+options:
+  shared: true
+  apiTimeout: 0
+  allowMultipleInstall: true
+  onlyAdmin: true
+  allowedOutboundPorts:
+    - 465
+    - 587
+  conflicts:
+    - name: localai
+      type: application
+  dependencies:
+    - name: olares
+      type: system
+      version: '>=1.12.6-0'
+  appScope:
+    clusterScoped: true
+    appRef:
+      - localai
+envs:
+  # Hugging Face mirror: system-sourced, NOT an install-dialog field. v3 forbids
+  # referencing OLARES_USER_* names inside chart template files; declare an
+  # app-local name here and pull the system value in via valueFrom. Templates
+  # reference .Values.olaresEnv.HF_ENDPOINT.
+  - envName: HF_ENDPOINT
+    required: false
+    applyOnChange: true
+    valueFrom:
+      envName: OLARES_USER_HUGGINGFACE_SERVICE

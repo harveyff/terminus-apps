@@ -1,0 +1,36 @@
+metadata:
+  description: 'OpenAI 和 Claude 的免费开源替代品'
+  title: LocalAI V3 测试版
+spec:
+  fullDescription: |
+    **重要说明**
+    这是一个共享应用。由 Olares 管理员安装后，集群内所有用户都可以通过 reference app 使用。
+
+    LocalAI 是免费的开源 OpenAI 替代品。LocalAI 可作为替代 REST API，与 OpenAI（Elevenlabs、Anthropic……）API 规范兼容，用于本地 AI 推理。它允许您在本地或使用消费级硬件本地运行 LLM、生成图像、音频（不止于此），支持多个模型系列。不需要 GPU。
+
+    **功能**
+    - 使用 GPT 生成文本（llama.cpp、transformers、vllm……等等）
+    - 文本转音频
+    - 音频转文本（使用 whisper.cpp 进行音频转录）
+    - 图像生成
+    - 类似 OpenAI 的工具 API
+    - 为矢量数据库生成嵌入
+    - 受限语法
+    - 直接从 Huggingface 下载模型
+    - 视觉 API
+    - Reranker API
+    - P2P 推理
+    - 语音活动检测（Silero-VAD 支持）
+    - 集成 WebUI！
+  upgradeDescription: |
+    LocalAI 的 V3 共享应用版本（引擎 v4.4.3，镜像
+    localai/localai:v4.4.3-gpu-nvidia-cuda-13）。
+    - 全新独立 v3 应用（appid localaiv3）；与旧版 localai 互斥（conflicts）。
+    - 单一引擎 Deployment 以 appid（localaiv3）命名，通过 workloadReplicas 声明；
+      入口直接路由到引擎 Service :8080。
+    - 新增 sharedentrances-api Service，集群内其他应用可通过内部共享域名访问
+      OpenAI 兼容 API。
+    - GPU 通过 spec.accelerator（nvidia）声明；模型与 v4 持久化目录
+      （data/backends/configuration）放在 appCache 下，重启后保留。
+    - 移除了旧 chart 的 admin 条件块、未使用的 postgres 中间件与无效的
+      models ConfigMap。

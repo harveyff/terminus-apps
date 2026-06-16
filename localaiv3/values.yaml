@@ -1,0 +1,6 @@
+# Per-workload replica counts (keys match Deployment metadata.name and
+# workloadReplicas in OlaresManifest).
+#   localaiv3 — LocalAI engine + WebUI Deployment (== appid / Release.Name)
+workloads:
+  localaiv3:
+    replicaCount: 1
