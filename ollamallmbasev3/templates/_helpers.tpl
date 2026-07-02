@@ -18,7 +18,8 @@
 {{- end -}}
 {{- end -}}
 {{- /* ollamallmbasev3.engineArgs: merge clone ENGINE_ARGS with chart defaults.
-       OLLAMA_KEEP_ALIVE=-1 unless set; CPU mode adds OLLAMA_NUM_GPU=0 unless set.
+       OLLAMA_KEEP_ALIVE=-1s (forever) unless set; Ollama 0.31+ rejects bare "-1"
+       in API keep_alive strings. CPU mode adds OLLAMA_NUM_GPU=0 unless set.
        Usage: {{ include "ollamallmbasev3.engineArgs" (dict "Args" ($oe.ENGINE_ARGS | default "") "IsCpu" $isCpuMode) }} */ -}}
 {{- define "ollamallmbasev3.engineArgs" -}}
 {{- $in := . -}}
@@ -26,11 +27,13 @@
 {{- $isCpu := $in.IsCpu | default false -}}
 {{- if not (contains "OLLAMA_KEEP_ALIVE" $args) -}}
 {{- if $args -}}
-{{- $args = printf "%s OLLAMA_KEEP_ALIVE=-1" $args -}}
+{{- $args = printf "%s OLLAMA_KEEP_ALIVE=-1s" $args -}}
 {{- else -}}
-{{- $args = "OLLAMA_KEEP_ALIVE=-1" -}}
+{{- $args = "OLLAMA_KEEP_ALIVE=-1s" -}}
 {{- end -}}
 {{- end -}}
+{{- /* Legacy installs used -1; normalize for Ollama 0.31+ duration parsing. */ -}}
+{{- $args = regexReplaceAll `OLLAMA_KEEP_ALIVE=-1($|\s)` `OLLAMA_KEEP_ALIVE=-1s$1` $args -}}
 {{- if and $isCpu (not (contains "OLLAMA_NUM_GPU" $args)) -}}
 {{- if $args -}}
 {{- $args = printf "%s OLLAMA_NUM_GPU=0" $args -}}
