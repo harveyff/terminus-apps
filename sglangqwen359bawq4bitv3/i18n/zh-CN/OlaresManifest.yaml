@@ -31,4 +31,5 @@ spec:
 
     **模型存储**
     所有模型文件存储在共享目录 `appCommon/huggingface`（挂载为 `/cache/hf/hub`），同类应用均使用此目录。
-
+  upgradeDescription: |
+    v1.0.4: 对齐 nvidia requiredGPUMemory 与 SGLANG_REQUIRED_GPU_MEMORY（23Gi）。
