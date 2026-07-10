@@ -34,7 +34,9 @@ workloadReplicas:
 spec:
   onlyAdmin: true
   versionName: 'cyankiwi/gemma-4-12B-it-AWQ-INT4'
-  upgradeDescription: |\n    v1.0.4: align nvidia requiredGPUMemory with VLLM_REQUIRED_GPU_MEMORY (23Gi) so gpumem request equals limit.\n  fullDescription: |
+  upgradeDescription: |
+    v1.0.4: align nvidia requiredGPUMemory with VLLM_REQUIRED_GPU_MEMORY (23Gi) so gpumem request equals limit.
+  fullDescription: |
     **Model Overview**
     Gemma-4-12B-it is an instruction-tuned vision-language model from Google's Gemma 4 family. It supports multimodal understanding, thinking, tool calling, and vision. This app serves the `AWQ-INT4` quantized weights from `cyankiwi/gemma-4-12B-it-AWQ-INT4` via vLLM.
 
