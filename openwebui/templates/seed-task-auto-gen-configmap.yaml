@@ -116,6 +116,13 @@ data:
             if "no such table" in str(e).lower():
                 return 0, 0
             raise
+        # v2: one-shot force false for the three Interface toggles, then only
+        # fill missing keys. Needed because the frontend defaults missing
+        # title.auto to true and can persist that before/after our first seed
+        # (so "never overwrite" alone leaves title stuck on).
+        SEED_MARK = "olaresTaskUiDefaults"
+        SEED_VER = 2
+
         updated = 0
         for uid, settings_raw in users:
             settings = ensure_dict(settings_raw)
@@ -124,23 +131,36 @@ data:
                 ui = {}
                 settings["ui"] = ui
             changed = False
-            # Frontend reads $settings?.title?.auto (nested), not ui["title.auto"].
+
+            # Drop mistaken flat key from older seed script.
+            if "title.auto" in ui:
+                ui.pop("title.auto", None)
+                changed = True
+
             title = ui.get("title")
             if not isinstance(title, dict):
                 title = {}
                 ui["title"] = title
-            if "auto" not in title:
-                # Migrate mistaken flat key from older seed script if present.
-                flat = ui.pop("title.auto", None)
-                title["auto"] = False if flat is None else bool(flat)
+
+            marked = ui.get(SEED_MARK) == SEED_VER
+            if not marked:
+                # One-shot: force defaults off even if frontend already wrote true.
+                title["auto"] = False
+                ui["autoFollowUps"] = False
+                ui["autoTags"] = False
+                ui[SEED_MARK] = SEED_VER
                 changed = True
-            elif "title.auto" in ui:
-                del ui["title.auto"]
-                changed = True
-            for key in ("autoFollowUps", "autoTags"):
-                if key not in ui:
-                    ui[key] = False
+                log(f"one-shot force Interface auto-gen defaults off for {uid}")
+            else:
+                # After the one-shot, only fill missing keys; never overwrite.
+                if "auto" not in title:
+                    title["auto"] = False
                     changed = True
+                for key in ("autoFollowUps", "autoTags"):
+                    if key not in ui:
+                        ui[key] = False
+                        changed = True
+
             if not changed:
                 continue
             conn.execute(
