@@ -9,8 +9,9 @@ data:
     """Best-effort Open WebUI defaults seed.
 
     Sidecar loop fills missing Settings→Interface keys with false; never
-    overwrites saved values. Uses adaptive backoff so SQLite is not poked
-    every few seconds forever (that can make /auth flicker under load).
+    overwrites saved values. Title uses nested ui.title.auto (OWUI frontend
+    reads $settings?.title?.auto). Adaptive backoff avoids poking SQLite
+    every few seconds forever.
     """
 
     from __future__ import annotations
@@ -123,7 +124,20 @@ data:
                 ui = {}
                 settings["ui"] = ui
             changed = False
-            for key in ("title.auto", "autoFollowUps", "autoTags"):
+            # Frontend reads $settings?.title?.auto (nested), not ui["title.auto"].
+            title = ui.get("title")
+            if not isinstance(title, dict):
+                title = {}
+                ui["title"] = title
+            if "auto" not in title:
+                # Migrate mistaken flat key from older seed script if present.
+                flat = ui.pop("title.auto", None)
+                title["auto"] = False if flat is None else bool(flat)
+                changed = True
+            elif "title.auto" in ui:
+                del ui["title.auto"]
+                changed = True
+            for key in ("autoFollowUps", "autoTags"):
                 if key not in ui:
                     ui[key] = False
                     changed = True
