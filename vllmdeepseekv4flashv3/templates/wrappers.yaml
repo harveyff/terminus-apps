@@ -1,0 +1,314 @@
+# Engine wrapper mounted into the vLLM container at /llm-init/wrappers. Helpers
+# inlined from llm-init v1.1.0 common.sh + vllm.sh (single engine). llm-init
+# downloads the model and writes model_download_finish under /run/llm-init;
+# the wrapper waits on it, then loads --model from MODEL_NAME (owner/repo).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-init-wrappers
+  namespace: {{ .Release.Namespace }}
+  labels:
+    io.kompose.service: vllm
+data:
+  spark_tune_gpu_util.py: |
+    #!/usr/bin/env python3
+    import os
+    import re
+    import sys
+
+    args = os.environ.get("ENGINE_ARGS", "").strip()
+    pod_mib = int(os.environ.get("VLLM_POD_MEMORY_MIB", "0") or "0")
+    if pod_mib <= 0:
+        print(args)
+        raise SystemExit
+
+    import torch
+
+    if not torch.cuda.is_available():
+        print(args)
+        raise SystemExit
+
+    _free, total = torch.cuda.mem_get_info()
+    headroom = float(os.environ.get("VLLM_SPARK_UTIL_HEADROOM", "0.90"))
+    target = (pod_mib * 1024 * 1024 / total) * headroom
+    target = max(0.05, min(target, 0.95))
+
+    old_m = re.search(r"--gpu-memory-utilization\s+([0-9.]+)", args)
+    old = old_m.group(1) if old_m else None
+    args = re.sub(r"\s*--gpu-memory-utilization\s+[0-9.]+", "", args).strip()
+    args = f"{args} --gpu-memory-utilization {target:.4f}".strip()
+
+    print(
+        f"Spark pod memory {pod_mib}Mi vs CUDA pool {total / (1024 ** 3):.2f}GiB: "
+        f"--gpu-memory-utilization {old or '<unset>'} -> {target:.4f}",
+        file=sys.stderr,
+    )
+    print(args)
+  vllm.sh: |
+    #!/bin/sh
+    # Waits for llm-init's sentinel, then starts vLLM's OpenAI server with
+    # --model "$MODEL_NAME" (HF owner/repo). ENGINE_ARGS is word-split and
+    # appended after the baseline flags, e.g. "--max-model-len 8192 --gpu-memory-utilization 0.9".
+    # Do NOT pass --disable-log-stats (llm-init's /api/diag/gpu needs /metrics).
+    set -eu
+
+    ENGINE=vllm
+    SENTINEL=${SENTINEL:-/run/llm-init/model_download_finish}
+    WAIT_INTERVAL=${WAIT_INTERVAL:-5}
+    WAIT_TIMEOUT=${WAIT_TIMEOUT:-3600}
+    log() { printf '[wrapper-%s] %s\n' "$ENGINE" "$*"; }
+
+    # DGX Spark (GB10 unified memory): disable vLLM's UMA free-memory override so
+    # cudaMemGetInfo is used (legacy charts cleared shared_sysmem_device_mem_sms;
+    # v0.20+ uses is_integrated_gpu instead).
+    patch_spark_mem_utils() {
+        [ "${VLLM_PATCH_SPARK_MEM_UTILS:-}" = "true" ] || return 0
+        _MEM_UTILS="/usr/local/lib/python3.12/dist-packages/vllm/utils/mem_utils.py"
+        if [ ! -f "$_MEM_UTILS" ]; then
+            log "WARN: $_MEM_UTILS missing, Spark mem_utils patch skipped"
+            return 0
+        fi
+        if grep -q 'spark-patched' "$_MEM_UTILS" || grep -q 'shared_sysmem_device_mem_sms = ()' "$_MEM_UTILS"; then
+            log "mem_utils.py already Spark-patched"
+            return 0
+        fi
+        if grep -q 'shared_sysmem_device_mem_sms = ' "$_MEM_UTILS"; then
+            sed -i 's/shared_sysmem_device_mem_sms = .*$/shared_sysmem_device_mem_sms = ()/' "$_MEM_UTILS"
+            if grep -q 'shared_sysmem_device_mem_sms = ()' "$_MEM_UTILS"; then
+                log "patched mem_utils.py (shared_sysmem_device_mem_sms cleared)"
+            else
+                log "WARN: Spark mem_utils patch failed (shared_sysmem_device_mem_sms unchanged)"
+            fi
+        elif grep -q 'is_integrated_gpu(device.index)' "$_MEM_UTILS"; then
+            sed -i 's/if current_platform.is_integrated_gpu(device.index):/if False:  # spark-patched/' "$_MEM_UTILS"
+            if grep -q 'spark-patched' "$_MEM_UTILS"; then
+                log "patched mem_utils.py (is_integrated_gpu branch disabled)"
+            else
+                log "WARN: Spark mem_utils patch failed (is_integrated_gpu pattern unchanged)"
+            fi
+        else
+            log "WARN: no known Spark mem_utils pattern, patch skipped"
+        fi
+    }
+
+    spark_tune_gpu_memory_utilization() {
+        [ "${VLLM_PATCH_SPARK_MEM_UTILS:-}" = "true" ] || return 0
+        [ "${VLLM_SPARK_AUTO_GPU_UTIL:-false}" = "true" ] || return 0
+        [ -n "${VLLM_POD_MEMORY_MIB:-}" ] || return 0
+        _tune_script="/llm-init/wrappers/spark_tune_gpu_util.py"
+        if [ ! -f "$_tune_script" ]; then
+            log "WARN: $_tune_script missing, Spark gpu util tune skipped"
+            return 0
+        fi
+        _tune_log=$(mktemp)
+        _new_args=$(ENGINE_ARGS="${ENGINE_ARGS:-}" python3 "$_tune_script" 2>"$_tune_log") || true
+        if [ -s "$_tune_log" ]; then
+            while IFS= read -r _line; do
+                log "$_line"
+            done <"$_tune_log"
+        fi
+        rm -f "$_tune_log"
+        if [ -n "${_new_args:-}" ]; then
+            ENGINE_ARGS="$_new_args"
+        fi
+    }
+
+    # flashinfer 0.6.x uses array.array[int] annotations; that is only
+    # subscriptable at runtime on Python 3.12+. Our jasl image is 3.10, so
+    # import flashinfer.comm crashes WorkerProc before engine start.
+    patch_flashinfer_py310() {
+        _fi_root=""
+        for _cand in \
+            /opt/vllm-venv/lib/python3.10/site-packages/flashinfer \
+            /opt/vllm-venv/lib/python3.11/site-packages/flashinfer \
+            /usr/local/lib/python3.10/dist-packages/flashinfer \
+            /usr/local/lib/python3.12/dist-packages/flashinfer; do
+            if [ -d "$_cand" ]; then
+                _fi_root="$_cand"
+                break
+            fi
+        done
+        [ -n "$_fi_root" ] || {
+            log "flashinfer not found, py310 annotation patch skipped"
+            return 0
+        }
+        # plain sh/dash: no read -d ''; grep -rl is enough.
+        grep -rl 'array\.array\[' "$_fi_root" 2>/dev/null | while IFS= read -r _py; do
+            [ -n "$_py" ] || continue
+            sed -i 's/array\.array\[[^]]*\]/array.array/g' "$_py"
+            log "patched flashinfer annotation in $_py"
+        done
+        log "flashinfer py310 annotation patch finished under $_fi_root"
+    }
+
+    looks_like_hf_repo_id() {
+        s=$1
+        case "$s" in
+            ""|/*|./*|*://*) return 1 ;;
+        esac
+        case "$s" in
+            */*)
+                rest=${s#*/}
+                case "$rest" in
+                    */*|*:*) return 1 ;;
+                esac
+                return 0
+                ;;
+            *) return 1 ;;
+        esac
+    }
+
+    # Block until the sentinel appears (or WAIT_TIMEOUT elapses).
+    elapsed=0
+    while [ ! -f "$SENTINEL" ]; do
+        if [ "$elapsed" -ge "$WAIT_TIMEOUT" ]; then
+            log "timed out after ${WAIT_TIMEOUT}s waiting for $SENTINEL"
+            exit 1
+        fi
+        log "waiting for $SENTINEL (elapsed=${elapsed}s)"
+        sleep "$WAIT_INTERVAL"
+        elapsed=$((elapsed + WAIT_INTERVAL))
+    done
+    log "sentinel $SENTINEL found after ${elapsed}s"
+
+    if ! looks_like_hf_repo_id "${MODEL_NAME:-}"; then
+        log "MODEL_NAME must be owner/repo for --model (got ${MODEL_NAME:-<empty>})"
+        exit 1
+    fi
+
+    patch_spark_mem_utils
+    patch_flashinfer_py310
+
+    # Olares env field is ENGINE_ARGS; value must be flags only (not "ENGINE_ARGS=...").
+    case "${ENGINE_ARGS:-}" in
+        ENGINE_ARGS=*) ENGINE_ARGS=${ENGINE_ARGS#ENGINE_ARGS=} ;;
+    esac
+
+    spark_tune_gpu_memory_utilization
+
+    # HAMi / PCIe: custom CUDA-IPC all-reduce dies with
+    # custom_all_reduce.cuh:455 'invalid argument'. Clear image-baked AR
+    # toggles; EXTRA_VLLM_ARGS / ENGINE_ARGS also disable custom AR.
+    unset NCCL_GRAPH_FILE NCCL_GRAPH_DUMP_FILE || true
+    unset VLLM_ENABLE_PCIE_ALLREDUCE VLLM_PCIE_ALLREDUCE_BACKEND || true
+    unset VLLM_CPP_AR_1STAGE_NCCL_CUTOFF VLLM_CPP_AR_IGNORE_CUTOFF_MAX_ROWS || true
+    unset VLLM_RTX6K_FUSED_ALLREDUCE_ADD VLLM_RTX6K_FUSED_ALLREDUCE_ADD_END_BARRIER || true
+    unset VLLM_CACHE_DIR || true
+    unset VLLM_B12X_MLA_EXTEND_MAX_CHUNKS || true
+
+    # Resolve a complete local HF snapshot (symlinks into blobs/ count).
+    resolve_local_model_path() {
+        _owner=${MODEL_NAME%/*}
+        _repo=${MODEL_NAME#*/}
+        _hub_base="${HF_HUB_CACHE:-/root/.cache/huggingface/hub}/models--${_owner}--${_repo}"
+        _min_shards="${DS4_MIN_SAFETENSORS_SHARDS:-20}"
+        _snapshot_ok() {
+            _d=$1
+            [ -d "$_d" ] || return 1
+            _n=$(find "$_d" -maxdepth 1 \( -type f -o -type l \) -name '*.safetensors' 2>/dev/null | wc -l | tr -d ' ')
+            if [ "${_n:-0}" -lt "$_min_shards" ]; then
+                _n=$(set -- "$_d"/*.safetensors; [ -e "$1" ] && echo "$#" || echo 0)
+            fi
+            [ "${_n:-0}" -ge "$_min_shards" ]
+        }
+        _model_path=""
+        if [ -f "${_hub_base}/refs/main" ]; then
+            _ref_rev=$(tr -d '[:space:]' <"${_hub_base}/refs/main")
+            if [ -n "$_ref_rev" ] && _snapshot_ok "${_hub_base}/snapshots/${_ref_rev}"; then
+                _model_path="${_hub_base}/snapshots/${_ref_rev}"
+            fi
+        fi
+        if [ -z "$_model_path" ] && [ -d "${_hub_base}/snapshots" ]; then
+            for _cand in $(find "${_hub_base}/snapshots" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort); do
+                if _snapshot_ok "$_cand"; then
+                    _model_path="$_cand"
+                    break
+                fi
+            done
+        fi
+        if [ -n "$_model_path" ]; then
+            MODEL_PATH="$_model_path"
+            export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+            log "resolved MODEL_PATH=$MODEL_PATH"
+        else
+            MODEL_PATH="$MODEL_NAME"
+            unset HF_HUB_OFFLINE TRANSFORMERS_OFFLINE || true
+            log "WARN: no complete local snapshot; using MODEL_NAME=$MODEL_NAME"
+        fi
+    }
+
+    resolve_local_model_path
+
+    # Strict Hub SHA256 verify (optional). Manifest + script live on the
+    # shared huggingface hostPath (drive/Common/huggingface/).
+    if [ "${MODEL_STRICT_VERIFY:-0}" = "1" ]; then
+        _vfy="${HF_HUB_CACHE:-/root/.cache/huggingface/hub}/_strict_verify_model.py"
+        _man="${MODEL_SHA256_MANIFEST:-${HF_HUB_CACHE:-/root/.cache/huggingface/hub}/dsv4_7872f01_sha256_manifest.json}"
+        export MODEL_REVISION="${MODEL_REVISION:-7872f01b1d1fe23eabc4c98b48bffcef5a386062}"
+        export MODEL_SHA256_MANIFEST="$_man"
+        export MODEL_VERIFY_WORKERS="${MODEL_VERIFY_WORKERS:-4}"
+        if [ ! -f "$_vfy" ] || [ ! -f "$_man" ]; then
+            log "STRICT VERIFY: missing $_vfy or $_man"
+            exit 1
+        fi
+        log "STRICT VERIFY: starting (full SHA256 of every Hub file; may take a long time)"
+        if ! python3 "$_vfy"; then
+            log "STRICT VERIFY: FAILED — see VERIFY_SHA256_REPORT.json under models--*"
+            if [ "${MODEL_STRICT_VERIFY_ONLY:-0}" = "1" ]; then
+                sleep infinity
+            fi
+            exit 1
+        fi
+        log "STRICT VERIFY: PASSED"
+        if [ "${MODEL_STRICT_VERIFY_ONLY:-0}" = "1" ]; then
+            log "STRICT VERIFY ONLY: sleeping (engine not started)"
+            sleep infinity
+        fi
+    fi
+
+    # Gilded Gnosis (rtx6kpro): serve-ds4-flash.sh owns the full vLLM argv.
+    if [ "${USE_SERVE_DS4_FLASH:-0}" = "1" ] && [ -x /usr/local/bin/serve-ds4-flash.sh ]; then
+        export MODE="${MODE:-dspark}"
+        export BACKEND="${BACKEND:-b12x-a8}"
+        export TP_SIZE="${TP_SIZE:-2}"
+        export DCP_SIZE="${DCP_SIZE:-1}"
+        export DSPARK_DEPTH_MODE="${DSPARK_DEPTH_MODE:-fixed}"
+        export DSPARK_TOKENS="${DSPARK_TOKENS:-5}"
+        export MAX_NUM_SEQS="${MAX_NUM_SEQS:-16}"
+        export MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
+        export MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-8192}"
+        export GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.975}"
+        # Default safetensors on 64Gi hosts; set LOAD_FORMAT=instanttensor only on fat RAM.
+        export LOAD_FORMAT="${LOAD_FORMAT:-safetensors}"
+        export INSTANTTENSOR_BACKEND="${INSTANTTENSOR_BACKEND:-BUFFERED}"
+        export PYTHONHASHSEED="${PYTHONHASHSEED:-0}"
+        export KV_OFFLOADING_SIZE="${KV_OFFLOADING_SIZE:-0}"
+        export PORT="${PORT:-${VLLM_PORT:-8000}}"
+        export MODEL_PATH MODEL="$MODEL_PATH" MODEL_ID="$MODEL_PATH"
+        export MODEL_NAME SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-$MODEL_NAME}"
+        export EXTRA_VLLM_ARGS="${EXTRA_VLLM_ARGS:---disable-custom-all-reduce}"
+        log "starting serve-ds4-flash.sh MODE=$MODE BACKEND=$BACKEND TP=$TP_SIZE K=$DSPARK_TOKENS model=$MODEL_PATH"
+        exec /usr/local/bin/serve-ds4-flash.sh
+    fi
+
+    log "starting vLLM model=$MODEL_PATH args=${ENGINE_ARGS:-<empty>}"
+
+    # Prefer `vllm` on PATH (orthozany image); else module entrypoint.
+    # shellcheck disable=SC2086
+    if command -v vllm >/dev/null 2>&1; then
+        exec vllm serve "$MODEL_PATH" \
+            --served-model-name "$MODEL_NAME" \
+            --host 0.0.0.0 \
+            --port "${VLLM_PORT:-8000}" \
+            ${ENGINE_ARGS:-} \
+            "$@"
+    fi
+
+    # shellcheck disable=SC2086
+    exec python3 -m vllm.entrypoints.openai.api_server \
+        --model "$MODEL_PATH" \
+        --served-model-name "$MODEL_NAME" \
+        --host 0.0.0.0 \
+        --port "${VLLM_PORT:-8000}" \
+        ${ENGINE_ARGS:-} \
+        "$@"

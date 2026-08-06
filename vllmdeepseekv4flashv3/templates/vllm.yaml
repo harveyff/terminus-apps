@@ -1,0 +1,218 @@
+{{- /* vLLM engine Deployment. ENGINE_ARGS = raw vLLM CLI flags, word-split and
+       appended after --model by wrappers/vllm.sh. */ -}}
+{{- $oe := .Values.olaresEnv | default dict -}}
+{{- $modelName := $oe.MODEL_NAME | default "" -}}
+{{- $hfEndpoint := $oe.HF_ENDPOINT | default "" -}}
+{{- /* Hard-pin ENGINE_ARGS (beclab jasl SM120 + DSpark K5, long-ctx balanced). */ -}}
+{{- $engineArgs := `--trust-remote-code --tokenizer-mode deepseek_v4 --kv-cache-dtype fp8 --block-size 256 --tensor-parallel-size 2 --disable-custom-all-reduce --gpu-memory-utilization 0.95 --kv-cache-memory 12582912000 --max-model-len 49152 --max-num-seqs 2 --max-num-batched-tokens 8192 --enable-auto-tool-choice --tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4 --speculative-config {"method":"dspark","num_speculative_tokens":5,"draft_sample_method":"greedy"}` -}}
+{{- /* Defaults avoid empty K8s quantities. CPU needs "m" (200m = 0.2 core).
+       Sums (llm-init + vllm) must fit the manifest accelerator limits. */ -}}
+{{- $cpuRequest := trim ($oe.VLLM_CPU_REQUEST | default "2000m") -}}
+{{- $memRequest := trim ($oe.VLLM_MEMORY_REQUEST | default "4Gi") -}}
+{{- $cpuLimit := trim ($oe.VLLM_CPU_LIMIT | default "16") -}}
+{{- $memLimit := trim ($oe.VLLM_MEMORY_LIMIT | default "28Gi") -}}
+{{- $gpuType := include "llmbase.gpuType" . -}}
+{{- /* beclab jasl SM120 self-build — DSpark + OpenWebUI tools. */ -}}
+{{- $engineImage := "docker.io/beclab/above-os-vllm-jasl-dsv4:sm120-20260804" -}}
+{{- if or (eq $gpuType "nvidia-gb10") (eq (include "llmbase.isGb10" .) "true") -}}
+{{- $engineImage = "docker.io/vllm/vllm-openai:v0.26.0-aarch64" -}}
+{{- else if eq (include "llmbase.hostArch" .) "arm64" -}}
+{{- $engineImage = "docker.io/vllm/vllm-openai:v0.26.0-aarch64" -}}
+{{- end -}}
+{{- $gb10FromNodes := eq (include "llmbase.isGb10" .) "true" -}}
+{{- $unifiedMem := or $gb10FromNodes (eq $gpuType "nvidia-gb10") -}}
+{{- $engineArgs = include "vllmdeepseekv4flashv3.engineArgs" (dict "Args" $engineArgs) -}}
+{{- /* nvidia.com/gpumem: pin from values.engine.requiredGpuMemory so request
+       and limit stay equal on upgrade (stale olaresEnv.VLLM_REQUIRED_GPU_MEMORY
+       previously left requests at 32Gi while gpu-inject set limits to 100Gi).
+       gb10: pod memory quota only; chart gpumem on gb10 breaks K8s validation. */ -}}
+{{- $gpuQty := .Values.engine.requiredGpuMemory | default "180Gi" -}}
+{{- $gpuMiB := include "llmbase.gpuMiB" $gpuQty -}}
+{{- if $unifiedMem -}}
+{{- $memRequest = printf "%sMi" $gpuMiB -}}
+{{- $memLimit = printf "%sMi" $gpuMiB -}}
+{{- end -}}
+{{- /* Must match llm-init.yaml: per-release run-state hostPath. */ -}}
+{{- $runStateHostPath := printf "%s/huggingface/llm-init-run/%s" .Values.userspace.appCommon .Release.Name -}}
+---
+# vLLM engine Deployment. wrappers/vllm.sh waits on llm-init's sentinel in
+# the shared run-state dir, then serves --model "$MODEL_NAME" on :8000. llm-init
+# reverse-proxies http://vllm:8000 via the "vllm" Service below.
+# Shared hostPath volumes (read-only here, llm-init owns writes): hf-cache
+# (/cache/hf/hub), run-state (sentinel handshake). vllm-cache and .nv/ComputeCache
+# live as subdirs of the same appCommon/huggingface store (siblings to models--*).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Primary workload: named after the release (== appid vllmdeepseekv4flashv3).
+  # Label/selector stays io.kompose.service: vllm.
+  name: '{{ .Release.Name }}'
+  namespace: {{ .Release.Namespace }}
+  labels:
+    io.kompose.service: vllm
+  annotations:
+    applications.app.bytetrade.io/gpu-inject: "vllm"
+    vllmdeepseekv4flashv3.io/engine-image: {{ $engineImage | quote }}
+spec:
+  replicas: {{ .Values.workloads.vllmdeepseekv4flashv3.replicaCount }}
+  selector:
+    matchLabels:
+      io.kompose.service: vllm
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.network/chrome-default: "true"
+        io.kompose.service: vllm
+    spec:
+      # Service name is "vllm"; K8s would inject VLLM_SERVICE_* / VLLM_PORT_* and
+      # confuse vLLM's own VLLM_* env parsing (port 8000 "already in use").
+      enableServiceLinks: false
+      restartPolicy: Always
+      volumes:
+        - name: hf-cache
+          hostPath:
+            path: "{{ .Values.userspace.appCommon }}/huggingface"
+            type: DirectoryOrCreate
+        - name: run-state
+          hostPath:
+            path: "{{ $runStateHostPath }}"
+            type: DirectoryOrCreate
+        - name: wrappers
+          configMap:
+            name: llm-init-wrappers
+            defaultMode: 0555
+        # Counts against container memory; keep modest (KV offload disabled).
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+      containers:
+        - name: vllm
+          image: "{{ $engineImage }}"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "/llm-init/wrappers/vllm.sh"]
+          env:
+            - name: ENGINE_KIND
+              value: vllm
+            - name: MODEL_NAME
+              value: "{{ $modelName }}"
+            - name: VLLM_PORT
+              value: "8000"
+            - name: PORT
+              value: "8000"
+            - name: WAIT_TIMEOUT
+              value: "3600"
+            - name: ENGINE_ARGS
+              value: {{ $engineArgs | quote }}
+            # Shared App Common HF hub (models--*) — match gilded compose layout.
+            - name: HF_HOME
+              value: /root/.cache/huggingface
+            - name: HF_HUB_CACHE
+              value: /root/.cache/huggingface/hub
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /root/.cache/huggingface/hub
+            # Wrapper sets offline only after resolving a local snapshot path.
+            - name: HF_HUB_DISABLE_TELEMETRY
+              value: "1"
+            # jasl image: plain `vllm serve` via wrapper (not gilded serve-ds4-flash).
+            - name: USE_SERVE_DS4_FLASH
+              value: "0"
+{{- if $hfEndpoint }}
+            - name: HF_ENDPOINT
+              value: "{{ $hfEndpoint }}"
+{{- end }}
+            - name: NCCL_IB_DISABLE
+              value: "1"
+            - name: NCCL_P2P_DISABLE
+              value: "1"
+            - name: FLASHINFER_DISABLE_VERSION_CHECK
+              value: "1"
+            - name: PYTORCH_CUDA_ALLOC_CONF
+              value: expandable_segments:True
+            # SM120: FlashInfer sampler JIT mis-parses 12.0a on some builds.
+            - name: VLLM_USE_FLASHINFER_SAMPLER
+              value: "0"
+            # SM120 long-prefill path (official stock IMA >~2k).
+            - name: VLLM_TRITON_MLA_SPARSE
+              value: "1"
+            - name: VLLM_ENGINE_READY_TIMEOUT_S
+              value: "3600"
+            - name: VLLM_CACHE_ROOT
+              value: /root/.cache/vllm
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PGID
+              value: "1000"
+            - name: PUID
+              value: "1000"
+            - name: TZ
+              value: Etc/UTC
+{{- if $unifiedMem }}
+            - name: VLLM_PATCH_SPARK_MEM_UTILS
+              value: "true"
+            - name: VLLM_SPARK_AUTO_GPU_UTIL
+              value: "false"
+{{- end }}
+          ports:
+            - name: vllm
+              containerPort: 8000
+          # No readiness/liveness probe (intentional): serving readiness is owned
+          # by llm-init (polls /v1/models, flips its own /readyz). A probe here
+          # would keep the Pod NotReady during the long model load and couple the
+          # app status back to it. restartPolicy: Always still recovers crashes.
+          volumeMounts:
+            # App Common huggingface/ == HF hub root (models--* live here).
+            - name: hf-cache
+              mountPath: /root/.cache/huggingface/hub
+            - name: hf-cache
+              mountPath: /root/.cache/vllm
+              subPath: vllm-cache
+            # Gilded compose mounts JIT/TileLang cache at /cache.
+            - name: hf-cache
+              mountPath: /cache
+              subPath: gilded-ds4-r27
+            - name: hf-cache
+              mountPath: /root/.nv/ComputeCache
+              subPath: .nv/ComputeCache
+            - name: dshm
+              mountPath: /dev/shm
+            - name: run-state
+              mountPath: /run/llm-init
+              readOnly: true
+            - name: wrappers
+              mountPath: /llm-init/wrappers
+              readOnly: true
+          resources:
+            # nvidia.com/gpumem: nvidia only in chart; gb10 via pod memory + gpu-inject.
+            requests:
+              cpu: "{{ $cpuRequest }}"
+              memory: "{{ $memRequest }}"
+{{- if not $unifiedMem }}
+              nvidia.com/gpumem: {{ $gpuMiB }}
+{{- end }}
+            limits:
+              cpu: "{{ $cpuLimit }}"
+              memory: "{{ $memLimit }}"
+{{- if not $unifiedMem }}
+              nvidia.com/gpumem: {{ $gpuMiB }}
+{{- end }}
+---
+# Service name MUST be "vllm": llm-init v1.1.0 derives the engine URL
+# http://vllm:8000 from ENGINE_KIND (no override). Internal only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: {{ .Release.Namespace }}
+  labels:
+    io.kompose.service: vllm
+spec:
+  selector:
+    io.kompose.service: vllm
+  ports:
+    - name: vllm
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

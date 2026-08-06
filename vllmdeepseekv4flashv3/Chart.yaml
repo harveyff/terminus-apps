@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: beclab-jasl-sm120-dspark-ml49152
+description: DeepSeek-V4-Flash-0731 served with vLLM + llm-init (multi-GPU, SM120)
+name: vllmdeepseekv4flashv3
+type: application
+version: 1.0.70

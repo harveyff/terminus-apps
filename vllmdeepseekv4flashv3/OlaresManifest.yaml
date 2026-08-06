@@ -1,0 +1,310 @@
+olaresManifest.version: '0.12.0'
+olaresManifest.type: app
+apiVersion: 'v3'
+metadata:
+  name: vllmdeepseekv4flashv3
+  icon: https://app.cdn.olares.com/appstore/vllm/icon.png
+  description: "DeepSeek-V4-Flash-0731 served with vLLM (multi-GPU)."
+  appid: vllmdeepseekv4flashv3
+  title: DeepSeek-V4-Flash (vLLM)
+  version: '1.0.70'
+  categories:
+    - AI
+sharedEntrances:
+  - name: vllmdeepseekv4flashv3
+    host: sharedentrances-api
+    port: 0
+    title: DeepSeek-V4-Flash API
+    invisible: true
+    authLevel: internal
+    icon: https://app.cdn.olares.com/appstore/vllm/icon.png
+entrances:
+  - name: vllmclient
+    port: 8090
+    host: download-svc
+    title: DeepSeek-V4-Flash
+    icon: https://app.cdn.olares.com/appstore/vllm/icon.png
+    openMethod: window
+    authLevel: internal
+#   vllmdeepseekv4flashv3 — engine Deployment (== appid / Release.Name)
+#   llminit               — llm-init / entrance Deployment
+workloadReplicas:
+  vllmdeepseekv4flashv3: 1
+  llminit: 1
+spec:
+  onlyAdmin: true
+  versionName: 'vllm-0.26.0-balanced-49k'
+  upgradeDescription: |
+    v1.0.70: Revert llm-init to beclab/llm-init:v1.3.5 (clean re-download test after Olah mirror fix).
+    v1.0.69: harveyff/llm-init:v1.3.5-fix-2-amd (mirror integrity fail → re-fetch from huggingface.co).
+    v1.0.68: harveyff/llm-init:v1.3.5-fix-1-amd (post-download HF integrity) + restore HF_ENDPOINT from olaresEnv / OLARES_SYSTEM_HUGGINGFACE_SERVICE.
+    v1.0.67: raise max-model-len to 49152 (measured KV ~53k @ 12GiB; DSpark K5 balanced).
+    v1.0.66: balanced DSpark K5 + max-model-len 28672 (12GiB KV / util 0.95; max-num-seqs 2).
+    v1.0.65: beclab/above-os-vllm-jasl-dsv4:sm120-20260804 + DSpark K5 + OpenWebUI tools + max-model-len 8192.
+    v1.0.64: OpenWebUI needs >2k ctx — switch lucifer SM120 image + SPARSE_MLA_SM120 + max-model-len 8192 (stock official IMA).
+    v1.0.63: Fix OpenWebUI EngineDead — SM120 IMA on long prefill; max-model-len 2048 + enforce-eager; keep tool/reasoning parsers.
+    v1.0.62: OpenWebUI tool/reasoning parsers + max-model-len 8192; DSpark off (SM120 stock sparse MLA crash).
+    v1.0.61: OpenWebUI — tool/reasoning parsers + DSpark K5; max-model-len 8192 (weights verified).
+    v1.0.60: Remove verify-only env entirely; force engine serve after SHA256 PASS.
+    v1.0.59: Pin HF_ENDPOINT=https://huggingface.co; re-fetch corrupt shards 00001-00004 from official Hub.
+    v1.0.58: Strict Hub SHA256 verify-only (L1 size + L2 content hash + L3 safetensors header + L4 index).
+    v1.0.57: Restore TP=2 bootable official baseline after TP=1 OOM.
+    v1.0.56: Official bisect — TP=1 (isolate multi-GPU/NCCL vs NaN).
+    v1.0.55: Official bisect — NCCL_P2P_DISABLE=0 NCCL_P2P_LEVEL=SYS (TP comm).
+    v1.0.54: Official bisect — --enforce-eager only (DeepGEMM+E8M0 kept).
+    v1.0.53: Official bisect — VLLM_USE_DEEP_GEMM_E8M0=0 (ue8m0 scale path).
+    v1.0.52: Official bisect — DeepGEMM linear ON, VLLM_MOE_USE_DEEP_GEMM=0 (MARLIN MoE).
+    v1.0.51: Official bisect — force Triton FP8 linear (disable Cutlass+DeepGEMM kernels).
+    v1.0.50: Official bisect — disable DeepGEMM (VLLM_USE_DEEP_GEMM=0 / MOE=0); isolate NaN logits.
+    v1.0.49: Official v0.26.0-cu129 with minimal ENGINE_ARGS (fp8 kv + TP2 + short ctx; no attention/moe/tool extras).
+    v1.0.48: Restore --kv-cache-dtype fp8 (DSv4 requires it; 1.0.47 CrashLoop). Redownload model after wipe.
+    v1.0.47: Drop kv-cache fp8 + enforce-eager — logprobs return NaN (argmax collapses to token 0).
+    v1.0.46: Drop NCCL_P2P_DISABLE; use NCCL_P2P_LEVEL=SYS (fix TP=2 all-zero BOS decode).
+    v1.0.45: voipmonitor/vllm:lucifer + SPARSE_MLA_SM120 + flashinfer_cutlass (jasl missing vllm._C / MARLIN BOS loop).
+    v1.0.44: Switch to jasl SM120 image + Triton sparse MLA envs — stock cu129 returns all-zero token_ids on short chat.
+    v1.0.43: Force short-ctx ENGINE_ARGS (max-model-len/batched-tokens 2048) on official v0.26.0-cu129.
+
+    v1.0.42: Official v0.26.0-cu129 smoke — max-model-len/batched-tokens 2048 (vllm#49896 short-prefill path).
+
+    v1.0.41: Switch to official docker.io/vllm/vllm-openai:v0.26.0-cu129, no DSpark (vllm#50720 baseline on SM120).
+
+    v1.0.40: Switch to orthozany/vllm-jasl-dsv4:pr41834-2026-05-13 (SM120 jasl recipe, no DSpark). Self-built 20260804 still token-0 BOS loops; stock vllm-openai not reliable on SM120.
+
+    v1.0.39: Drop DSpark speculative — snap 7872f01 loops <|begin_of_sentence|> / token 0 (weights verified 48/48).
+
+    v1.0.38: Patch flashinfer array.array[int] annotations for Python 3.10 (WorkerProc TypeError on import flashinfer.comm).
+
+    v1.0.37: Mirror engine image to docker.io/beclab/above-os-vllm-jasl-dsv4:sm120-20260804 — GHCR TLS handshake timeout on Olares node.
+
+    v1.0.36: Abandon Gilded b12x-a8 (token 1023 / <|image|> loops) — switch to self-built jasl SM120 + DSpark K5.
+
+    v1.0.35: Fix InstantTensor BUFFERED crash on 64Gi host — LOAD_FORMAT=safetensors (io_uring_register_buffers ENOMEM).
+
+    v1.0.34: Retry rtx6kpro Gilded Gnosis r27 — voipmonitor serve-ds4-flash, DSpark fixed K5, SparkInfer b12x-a8, InstantTensor BUFFERED, TP=2.
+
+    v1.0.33: Drop speculative — May jasl image has no dspark; deepseek_mtp KeyErrors on 0731 MTP weight names.
+
+    v1.0.32: orthozany jasl image has no method=dspark — use deepseek_mtp K5.
+
+    v1.0.31: Switch to orthozany/vllm-jasl-dsv4:pr41834-2026-05-13 + DSpark K5 (skip gilded serve-ds4-flash).
+
+    v1.0.30: Keep lucifer-cutlass; MODE=dspark-mtp0 — DSpark on still emitted <|image|> loops.
+
+    v1.0.29: Switch BACKEND=lucifer-cutlass — b12x-a8 decode collapsed (token 1023 / <|image|> loops).
+
+    v1.0.28: Align with official r27 — MODE=dspark, drop --enforce-eager, gpu-memory-utilization 0.95 (keep HAMi --disable-custom-all-reduce).
+
+    v1.0.27: Disable broken DSpark on local 7872f01 snap (MODE=dspark-mtp0) — fixes <|begin_of_sentence|> loops.
+
+    v1.0.26: Fix false-negative local snapshot detect (HF symlink safetensors); stop Hub hang, use llm-init cache.
+
+    v1.0.25: Skip incomplete Hub snaps (<20 safetensors); prefer complete local weights over partial 9e165c30.
+
+    v1.0.24: Prefer local HF snapshot (avoid Hub SSL timeout); HF_ENDPOINT=hf-mirror.com fallback.
+
+    v1.0.23: Fix r27 LocalEntryNotFoundError — resolve local snapshot to MODEL_PATH; don't force HF_HUB_OFFLINE against pinned revision 9e165c30.
+
+    v1.0.22: Official DS4 image — voipmonitor/vllm gilded-gnosis-v20 ...-r27 + serve-ds4-flash.sh (DSpark K5 / SparkInfer).
+
+    v1.0.21: Fix long-prefill IMA (vLLM #49896) — switch to B12X image + B12X_MLA_SPARSE (Lucifer Triton topk dies after ~2048 tokens).
+
+    v1.0.20: Inference IMA under HAMi — --enforce-eager (no CUDA graphs); use Olares App exclusive GPU mode.
+
+    v1.0.19: Fix HAMi crash — --disable-custom-all-reduce (custom_all_reduce.cuh:455 invalid argument) + unset Lucifer PCIe AR env.
+
+    v1.0.18: Switch to voipmonitor/vllm:lucifer (SPARSE_MLA_SM120 + flashinfer_cutlass); lucifer1004 still hit MARLIN illegal memory access.
+
+    v1.0.17: Hardcode lucifer1004/dsv4-flash-sm120 in template (upgrade reuses stale engine.images.nvidia=v0.26.0 from release values).
+
+    v1.0.16: Force-pin SM120 engine image in Deployment template (1.0.15 upgrade kept stale vllm-openai:v0.26.0 from old Helm values).
+
+    v1.0.15: Shorten context for SM120 smoke — max-model-len 8192, max-num-batched-tokens 2048 (same stack as 1.0.14).
+
+    v1.0.14: SM120 fix — switch to lucifer1004/dsv4-flash-sm120 (stock v0.26.0 hits vLLM #49896 illegal memory access on long prefill); add NCCL_P2P_DISABLE=1 for Blackwell PCIe TP; align ENGINE_ARGS with #43477 recipe.
+
+    v1.0.13: Raise GPU quota to 180Gi (~90Gi/card) + --enforce-eager to fix CUDA illegal memory access under memory-slicing.
+
+    v1.0.12: Enable OpenWebUI tools — --enable-auto-tool-choice --tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4.
+
+    v1.0.11: Pin ENGINE_ARGS in chart values (force marlin+TP=2); ignore stale install env still using MegaMoE/DP.
+
+    v1.0.10: SM120 path — switch to tensor-parallel-size 2 + marlin; make ENGINE_ARGS editable so upgrades can pick up new flags.
+
+    v1.0.9: SM120 (RTX PRO 6000) ENGINE_ARGS — use marlin MoE backend; drop SM100-only deep_gemm_mega_moe and DSpark.
+
+    v1.0.8: Offline HF load (HF_HUB_OFFLINE) + writable hub cache mount to avoid stalled weight load.
+
+    v1.0.7: Pin nvidia.com/gpumem request=limit from chart values (fix upgrade mismatch 32Gi vs 100Gi).
+
+    v1.0.6: Raise requiredGPUMemory to 100Gi so HAMi binds 2 cards for DP=2; disable Service env links that collide with VLLM_*.
+
+    v1.0.5: Further lower requiredGPUMemory to 32Gi (5Gi+32Gi=37Gi host check).
+
+    v1.0.4: Shrink requiredGPUMemory so requiredMemory+requiredGPUMemory fits ~64Gi host (time-slicing adds VRAM into the host-memory check).
+
+    v1.0.3: Lower host RAM envelope for 64Gi nodes (required 8Gi / limit 40Gi).
+
+    v1.0.2: Fix accelerator field to supportMultiCards (plural) so multi-GPU preflight aggregates VRAM.
+
+    v1.0.1: Bump llm-init to v1.3.5.
+
+    v1.0.0: Initial release — DeepSeek-V4-Flash-0731 on vLLM 0.26.0 with supportMultiCards.
+  fullDescription: |
+    **Model Overview**
+    DeepSeek-V4-Flash-0731 on SM120 (RTX PRO 6000). Official FP8/FP4 MoE checkpoint (~155Gi on disk). Requires 2× high-VRAM NVIDIA GPUs.
+
+    **Preset Configuration**
+    - Model: `deepseek-ai/DeepSeek-V4-Flash-0731`
+    - Capabilities: thinking, tools
+    - Engine image: docker.io/vllm/vllm-openai:v0.26.0-cu129 (minimal official smoke)
+    - Launch: jasl SM120 vllm serve, max-model-len 2048, TP=2, Triton sparse MLA, no DSpark
+    - Required GPU memory: `180Gi` (~90Gi per card under memory-slicing)
+    - Host RAM: `5Gi`
+    - Env: `NCCL_P2P_DISABLE=1` (Blackwell PCIe TP)
+
+    **How It Works**
+    First, `llm-init` downloads the model and gets it ready, then vLLM starts serving the model when it's ready. Engine and llm-init run as separate Deployments and share the model directory and readiness sentinel via App Common.
+
+    **Stack**
+    - **vLLM** (port 8000): runs the model and serves API requests
+    - **llm-init** (port 8090): downloads the model, shows progress, and provides the OpenAI API, proxying to vLLM
+
+    **Accelerator modes**
+    | Mode           | Device            | Details                                                              |
+    |----------------|-------------------|----------------------------------------------------------------------|
+    | `nvidia`       | GPU (CUDA)        | `supportMultiCards: true`; `requiredGPUMemory` 180Gi (2 cards)       |
+
+    **Model Storage**
+    All model files are stored in a shared folder at `appCommon/huggingface`, mounted as `/cache/hf/hub`. All similar apps use this location for models.
+
+    **Resource Tips**
+    - Needs ~155Gi disk in the shared HF cache and 2 physical GPUs (TP=2).
+    - Prefer **Exclusive** GPU mode on SM120; Memory slicing is OK if each card gets ~90Gi.
+    - First pull of `dsv4-flash-sm120` is ~10Gi — wait for ImagePull.
+    - After upgrade, confirm image is `lucifer1004/dsv4-flash-sm120` and `args=` has `marlin` + `tensor-parallel-size 2`.
+    - Launch dialog: select **both** GPUs if prompted.
+
+  developer: DeepSeek-AI / vLLM
+  website: https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731
+  sourceCode: https://github.com/vllm-project/vllm
+  submitter: Olares
+  locale:
+    - en-US
+    - zh-CN
+  license:
+    - text: MIT
+      url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731
+
+  accelerator:
+    - mode: nvidia
+      supportMultiCards: true
+      supportMultiNodes: false
+      # vllm 2000m/16 + llm-init 100m/500m
+      limitedCpu: "17000m"
+      requiredCpu: "2200m"
+      requiredDisk: 50Mi
+      limitedDisk: 500Gi
+      # Container sums: vllm 4Gi/28Gi + llm-init 128Mi/4Gi => request≤5Gi, limit≤32Gi.
+      # 180Gi across 2× ~96Gi cards (~90Gi each after HAMi split). Need Memory slicing.
+      limitedMemory: "32Gi"
+      requiredMemory: "5Gi"
+      requiredGPUMemory: "180Gi"
+      limitedGPUMemory: "190Gi"
+  supportArch:
+    - amd64
+permission:
+  appData: true
+  appCommon: true
+options:
+  apiTimeout: 0
+  LLMGatewaySupported: true
+  shared: true
+  templateOnly: false
+  dependencies:
+    - name: olares
+      version: '>=1.12.6-0'
+      type: system
+envs:
+  - envName: MODEL_SOURCE
+    required: true
+    type: string
+    editable: false
+    applyOnChange: false
+    default: "hf://deepseek-ai/DeepSeek-V4-Flash-0731"
+    description: "HuggingFace source for DeepSeek-V4-Flash-0731."
+    regex: "^hf://"
+  - envName: MODEL_NAME
+    required: true
+    type: string
+    editable: false
+    applyOnChange: false
+    default: "deepseek-ai/DeepSeek-V4-Flash-0731"
+  - envName: MODEL_MODE
+    required: true
+    type: string
+    editable: false
+    applyOnChange: false
+    default: "chat"
+  - envName: MODEL_SUPPORTS
+    required: true
+    type: string
+    editable: false
+    applyOnChange: false
+    default: "thinking,tools"
+  - envName: ENGINE_ARGS
+    required: true
+    type: string
+    editable: true
+    applyOnChange: true
+    default: '--trust-remote-code --tokenizer-mode deepseek_v4 --kv-cache-dtype fp8 --block-size 256 --tensor-parallel-size 2 --disable-custom-all-reduce --gpu-memory-utilization 0.95 --kv-cache-memory 12582912000 --max-model-len 49152 --max-num-seqs 2 --max-num-batched-tokens 8192 --enable-auto-tool-choice --tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4 --speculative-config {"method":"dspark","num_speculative_tokens":5,"draft_sample_method":"greedy"}'
+    description: "Display/default only — Deployment pins args from chart values.engine.args."
+  - envName: LOG_LEVEL
+    required: false
+    type: string
+    editable: false
+    applyOnChange: false
+    default: "info"
+  - envName: HF_ENDPOINT
+    required: false
+    type: string
+    editable: true
+    applyOnChange: true
+    valueFrom:
+      envName: OLARES_SYSTEM_HUGGINGFACE_SERVICE
+  - envName: HF_TOKEN
+    required: false
+    applyOnChange: true
+    valueFrom:
+      envName: OLARES_SYSTEM_HUGGINGFACE_TOKEN
+  - envName: VLLM_CPU_REQUEST
+    required: true
+    default: "2000m"
+    type: string
+    editable: false
+    applyOnChange: false
+  - envName: VLLM_MEMORY_REQUEST
+    required: true
+    default: "4Gi"
+    type: string
+    editable: false
+    applyOnChange: false
+  - envName: VLLM_CPU_LIMIT
+    required: true
+    default: "16"
+    type: string
+    editable: false
+    applyOnChange: false
+  - envName: VLLM_MEMORY_LIMIT
+    required: true
+    default: "28Gi"
+    type: string
+    editable: false
+    applyOnChange: false
+  - envName: VLLM_REQUIRED_GPU_MEMORY
+    required: true
+    type: string
+    editable: false
+    applyOnChange: false
+    default: "180Gi"
+    description: "Aggregate GPU memory across 2 cards (~90Gi each). Keep Memory slicing / Exclusive."
+    regex: "^[0-9]+(Gi|Mi)?$"

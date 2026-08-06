@@ -141,7 +141,19 @@ spec:
       containers:
         - name: opencode
           image: "{{ $image }}"
-          command: ["sh", "-c", "exec /opt/olares-bake/lib/start-opencode.sh"]
+          # start-opencode.sh uses `opencode web`, which spawns xdg-open and logs
+          # ENOENT in headless containers. `serve` is the upstream headless mode.
+          command:
+            - "sh"
+            - "-c"
+            - |
+              echo "=== Runtime check ==="
+              command -v bash >/dev/null 2>&1 && echo "bash OK" || echo "bash: waiting for pkg-manager fix"
+              if [ ! -f "$HOME/.venv/bin/activate" ]; then
+                echo "Creating Python venv..."
+                python3 -m venv "$HOME/.venv"
+              fi
+              exec opencode serve --hostname 0.0.0.0 --port 3000
           workingDir: /home/opencode/workspace
           securityContext:
             runAsUser: 1000

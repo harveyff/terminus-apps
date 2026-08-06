@@ -1,0 +1,39 @@
+metadata:
+  description: "DeepSeek-V4-Flash-0731 served with vLLM (multi-GPU)."
+  title: DeepSeek-V4-Flash (vLLM)
+
+spec:
+  fullDescription: |
+    **Model Overview**
+    DeepSeek-V4-Flash-0731 on SM120 (RTX PRO 6000). Official FP8/FP4 MoE checkpoint (~155Gi on disk). Requires 2× high-VRAM NVIDIA GPUs.
+
+    **Preset Configuration**
+    - Model: `deepseek-ai/DeepSeek-V4-Flash-0731`
+    - Capabilities: thinking, tools
+    - Engine image: `lucifer1004/dsv4-flash-sm120:20260604` (stock `vllm-openai:v0.26.0` crashes on SM120 long prefill — vLLM #49896)
+    - Engine args: `--trust-remote-code --tokenizer-mode deepseek_v4 --kv-cache-dtype fp8 --block-size 256 --tensor-parallel-size 2 --enable-expert-parallel --gpu-memory-utilization 0.90 --max-model-len 8192 --max-num-batched-tokens 2048 --moe-backend marlin --kernel-config={"moe_backend":"marlin"} --compilation-config={"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]} --enable-auto-tool-choice --tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4 --enable-flashinfer-autotune`
+    - Required GPU memory: `180Gi` (~90Gi per card under memory-slicing)
+    - Host RAM: `5Gi`
+    - Env: `NCCL_P2P_DISABLE=1` (Blackwell PCIe TP)
+
+    **How It Works**
+    First, `llm-init` downloads the model and gets it ready, then vLLM starts serving the model when it's ready. Engine and llm-init run as separate Deployments and share the model directory and readiness sentinel via App Common.
+
+    **Stack**
+    - **vLLM** (port 8000): runs the model and serves API requests
+    - **llm-init** (port 8090): downloads the model, shows progress, and provides the OpenAI API, proxying to vLLM
+
+    **Accelerator modes**
+    | Mode           | Device            | Details                                                              |
+    |----------------|-------------------|----------------------------------------------------------------------|
+    | `nvidia`       | GPU (CUDA)        | `supportMultiCards: true`; `requiredGPUMemory` 180Gi (2 cards)       |
+
+    **Model Storage**
+    All model files are stored in a shared folder at `appCommon/huggingface`, mounted as `/cache/hf/hub`. All similar apps use this location for models.
+
+    **Resource Tips**
+    - Needs ~155Gi disk in the shared HF cache and 2 physical GPUs (TP=2).
+    - Prefer **Exclusive** GPU mode on SM120; Memory slicing is OK if each card gets ~90Gi.
+    - First pull of `dsv4-flash-sm120` is ~10Gi — wait for ImagePull.
+    - After upgrade, confirm image is `lucifer1004/dsv4-flash-sm120` and `args=` has `marlin` + `tensor-parallel-size 2`.
+    - Launch dialog: select **both** GPUs if prompted.
