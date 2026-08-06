@@ -1,0 +1,39 @@
+metadata:
+  description: "使用 vLLM 部署 DeepSeek-V4-Flash-0731（多卡）。"
+  title: DeepSeek-V4-Flash (vLLM)
+
+spec:
+  fullDescription: |
+    **模型概览**
+    在 SM120（RTX PRO 6000）上部署 DeepSeek-V4-Flash-0731。官方 FP8/FP4 MoE 权重（磁盘约 155Gi）。需要 2 张高显存 NVIDIA GPU。
+
+    **预设配置**
+    - 模型：`deepseek-ai/DeepSeek-V4-Flash-0731`
+    - 能力：thinking、tools
+    - 引擎镜像：`lucifer1004/dsv4-flash-sm120:20260604`（官方 `vllm-openai:v0.26.0` 在 SM120 长 prefill 会非法访存，见 vLLM #49896）
+    - 引擎参数：`--trust-remote-code --tokenizer-mode deepseek_v4 --kv-cache-dtype fp8 --block-size 256 --tensor-parallel-size 2 --enable-expert-parallel --gpu-memory-utilization 0.90 --max-model-len 8192 --max-num-batched-tokens 2048 --moe-backend marlin --kernel-config={"moe_backend":"marlin"} --compilation-config={"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]} --enable-auto-tool-choice --tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4 --enable-flashinfer-autotune`
+    - 所需 GPU 显存：`180Gi`（显存切片下约 90Gi/卡）
+    - 主机内存：`5Gi`
+    - 环境变量：`NCCL_P2P_DISABLE=1`（Blackwell PCIe 多卡必需）
+
+    **工作流程**
+    首先由 `llm-init` 下载并准备模型，就绪后 vLLM 启动服务。引擎与 llm-init 为独立 Deployment，通过 App Common 共享模型目录与就绪 sentinel。
+
+    **技术栈**
+    - **vLLM**（8000 端口）：运行模型并提供 API
+    - **llm-init**（8090 端口）：下载模型、展示进度，并通过 OpenAI API 代理到 vLLM
+
+    **加速器模式**
+    | 模式           | 设备             | 说明                                                         |
+    |----------------|------------------|--------------------------------------------------------------|
+    | `nvidia`       | GPU (CUDA)       | `supportMultiCards: true`；`requiredGPUMemory` 180Gi（双卡） |
+
+    **模型存储**
+    所有模型文件存储在共享目录 `appCommon/huggingface`（挂载为 `/cache/hf/hub`），同类应用均使用此目录。
+
+    **资源建议**
+    - 共享 HF 缓存约需 155Gi 磁盘，并需要 2 张物理 GPU（TP=2）。
+    - SM120 优先用 **独占**；显存切片需保证每卡约 90Gi。
+    - 首次拉取 `dsv4-flash-sm120` 约 10Gi，请等待 ImagePull。
+    - 升级后确认镜像为 `lucifer1004/dsv4-flash-sm120`，且 `args=` 含 `marlin` 与 `tensor-parallel-size 2`。
+    - 启动时可在对话框中同时选择两张 GPU。
