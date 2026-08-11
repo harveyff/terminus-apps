@@ -7,7 +7,7 @@ metadata:
   description: "Generic llama.cpp engine base. Pick any GGUF model at install via env."
   appid: llamacppllmbasev3
   title: llama.cpp Engine Base
-  version: '1.2.28'
+  version: '1.2.29'
   categories:
     - AI
 sharedEntrances:
@@ -33,16 +33,27 @@ workloadReplicas:
   llminit: 1
 spec:
   onlyAdmin: true
-  versionName: 'b10331'
+  versionName: 'b10335'
   upgradeDescription: |
-    Bump llama.cpp image to server-cuda12-b10331. Chart 1.2.28.
+    Bump llama.cpp image to server-cuda12-b10335. Chart 1.2.29.
 
-    **What's Changed** (b10156 → b10331)
-    - New models / multimodal: Laguna-S-2.1, Nemotron 3 Nano Omni, MiniMax-M3 parser, Qwen3-TTS, MiniCPM-V 4.6, Unlimited-OCR / DeepSeek-OCR fixes
-    - Speculative decoding: DSpark, Eagle3-v3 (gpt-oss), MTP for DeepSeek V3.2 / V4, GLM-5.2, Qwen3-Next, GLM-4.7-Flash; `/metrics` spec-decode counters
-    - DeepSeek V4: FA with quantized V cache, Metal hyper-connections / Lightning Indexer, tool-call-in-thinking, Flash 0731 chat template
-    - Server: input embedding → next token; get_info / tool isolation (docker); router LRU + busy-model eviction fix; notice of default port 8080 → 9931
-    - CUDA: Q2_0, Mamba-2 chunked SSD prefill, fused rms_norm+mul+rope, backend penalty sampler
+    **What's Changed** (b10331 → b10335)
+    - ggml-cpu: fix missing Q5_0 dispatch in SpaceMiT backend
+    - WebUI: degrade working-directory picker when file_glob_search is disabled (manual entry still works)
+    - CI/build only: remove `GGML_HIP_ROCWMMA_FATTN`; no CUDA server runtime impact
+
+    **Startup params / env vars:** No changes required. Chart still launches `llama-server` with `-hf`, `--alias`, `--host 0.0.0.0`, `--port 8081`, `--metrics`, plus user `ENGINE_ARGS` / `LLAMA_ARG_*`. Container env (`MODEL_NAME`, `ENGINE_ARGS`, `HF_HUB_CACHE`, `HF_ENDPOINT`, `HF_TOKEN`, etc.) unchanged.
+
+    **Recent upstream builds** (b10326 → b10335)
+    - **b10326** — TTS: account for vocoder pass in timings line
+    - **b10327** — CUDA: fix thread/block count in quantized cpy kernel launches
+    - **b10328** — Server: initial tool isolation support (via docker)
+    - **b10329** — Server/UI: only offer working directory when a tool reads it
+    - **b10330** — CUDA: fuse rms_norm + mul + rope (+ view + set_rows)
+    - **b10331** — Server: report isolate working directory from get_info
+    - **b10332** — CI: remove `GGML_HIP_ROCWMMA_FATTN` (HIP build flag)
+    - **b10333** — ggml-cpu: fix missing Q5_0 dispatch in SpaceMiT backend
+    - **b10335** — WebUI: degrade working-directory picker when file search is off
 
     See https://github.com/ggml-org/llama.cpp/releases for full upstream release notes.
   fullDescription: |
