@@ -25,3 +25,4 @@ scripts/
 icons/source_*
 promo/screenshot_*
 promo/upstream_*
+docker/*.tar.gz
