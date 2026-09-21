@@ -7,7 +7,7 @@ metadata:
   description: "Qwen3.6-27B MTP UD-Q4_K_XL served with llama.cpp."
   appid: llamacppqwen3627bmtpq4kxlv3
   title: Qwen3.6-27B MTP (llama.cpp)
-  version: '1.0.23'
+  version: '1.0.24'
   categories:
   - AI
   - models
@@ -38,6 +38,8 @@ spec:
   onlyAdmin: true
   versionName: 'unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
   upgradeDescription: |
+    v1.0.24: Use llama.cpp `server-cuda12-b11028` by default; on Olares >= 1.12.7 switch to `server-cuda13-b11028`.
+
     v1.0.23: Model Console (llm-init) updated to v1.7.21.
 
     v1.0.22: Model Console upgrades to llm-init v1.7.19.
@@ -82,7 +84,7 @@ spec:
     First, Model Console downloads the model and gets it ready, then `llama.cpp` starts serving when ready. MTP (`--spec-type draft-mtp`) uses the model's built-in draft head to predict multiple tokens per step for higher decode throughput.
 
     **Stack**
-    - **llama.cpp** (`server-cuda12-b10068`): Runs the model and serves API requests (port 8081)
+    - **llama.cpp** (`server-cuda12-b11028`, or `server-cuda13-b11028` on Olares >= 1.12.7): Runs the model and serves API requests (port 8081)
     - **Model Console**: Downloads the model, shows progress, and provides the OpenAI API on port 8090, proxying to `llamacpp`
 
     **Model Storage**

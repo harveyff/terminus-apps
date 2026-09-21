@@ -32,3 +32,14 @@
 {{- end -}}
 {{- $args -}}
 {{- end -}}
+{{- /* CUDA runtime image: Olares >= 1.12.7 uses CUDA 13; otherwise CUDA 12.
+       Missing sysVersion (lint/dry-run) stays on CUDA 12. */ -}}
+{{- define "llamacppqwen3627bmtpq4kxlv3.cudaImage" -}}
+{{- $cuda12 := "docker.io/beclab/ggml-org-llama.cpp:server-cuda12-b11028" -}}
+{{- $cuda13 := "docker.io/beclab/ggml-org-llama.cpp:server-cuda13-b11028" -}}
+{{- if and .Values.sysVersion (semverCompare ">=1.12.7-0" (toString .Values.sysVersion)) -}}
+{{- $cuda13 -}}
+{{- else -}}
+{{- $cuda12 -}}
+{{- end -}}
+{{- end -}}

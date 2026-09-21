@@ -4,6 +4,8 @@ metadata:
 
 spec:
   upgradeDescription: |
+    v1.0.24: llama.cpp usa `server-cuda12-b11028` por defecto; en Olares >= 1.12.7 cambia a `server-cuda13-b11028`.
+
     v1.0.23: Model Console (llm-init) se ha actualizado a v1.7.21.
 
     v1.0.22: Model Console se actualiza a llm-init v1.7.19.
