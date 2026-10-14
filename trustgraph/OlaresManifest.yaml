@@ -13,7 +13,7 @@ metadata:
   - agents
   tags:
   - rag
-  - knowledge-graph
+  - knowledge-base
 entrances:
 - name: trustgraph
   host: trustgraph-ui
